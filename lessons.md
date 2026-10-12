@@ -13,3 +13,4 @@ One line per real failure: date, what broke, the rule that prevents it.
 - 2026-10-13: `claude -p --tools ""` still exposed MCP connectors (Google Drive search, read, create). Rule: headless runs on untrusted text use the full LOCKDOWN flags from an empty temp dir, and a test asserts them.
 - 2026-10-13: contract evidence came from a brief generated before the final fixes. Rule: delete outputs and rerun from clean before quoting numbers in a contract.
 - 2026-10-13: an edit that rewrote "from test X to end of file" deleted a later test. Rule: compare test counts before and after editing test files.
+- 2026-10-13: gh was logged in but git used SSH with no key, so the first push failed. Rule: the repo remote is HTTPS with a repo-local gh credential helper.
