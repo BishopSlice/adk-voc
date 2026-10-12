@@ -1,0 +1,17 @@
+repos: [adk-python, adk-go, adk-java, adk-js, adk-docs]
+models: {maker: sonnet, checker: opus}
+publish_bar: 0.95
+other_drift_bar: 0.15
+# Changing themes or weights is an Ask first action.
+themes:
+  Tools: 1.5
+  Model providers and streaming: 1.5
+  Docs, CI and dev setup: 1.0
+  Sessions, state and memory: 2.0
+  Security, auth and data leaks: 3.0
+  Multi-agent orchestration: 2.0
+  Eval, tracing and observability: 1.5
+  Human-in-the-loop: 2.5
+  Core runtime: 2.0
+  A2A interop: 1.5
+  Other: 1.0
