@@ -1,0 +1,11 @@
+- Tools: function tools, OpenAPI, MCP toolsets, tool results and tool config
+- Model providers and streaming: model integrations (Gemini, LiteLlm, Claude...), streaming, live/bidi connections
+- Docs, CI and dev setup: documentation, tests, CI, build, dependencies, local dev tooling and dev UI
+- Sessions, state and memory: session services, state, memory, artifacts and their storage
+- Security, auth and data leaks: credentials, auth, secrets, access control, exposure of sensitive data
+- Multi-agent orchestration: multi-agent, workflow agents (sequential, loop, parallel), sub-agents, graphs, agent transfer
+- Eval, tracing and observability: evaluation, evaluators, tracing, spans, telemetry, logging
+- Human-in-the-loop: tool confirmation, pause and resume for human input
+- Core runtime: runner, invocation context, callbacks, plugins, events, templating
+- A2A interop: Agent-to-Agent protocol integration
+- Other: none of the above
