@@ -7,7 +7,9 @@ import brief
 import check
 import classify
 import fetch
+import quotes
 import spam
+from score import pain_table
 
 HERE = Path(__file__).resolve().parent
 
@@ -28,14 +30,16 @@ def main():
     issues = json.loads(f.read_text())
     this_week = [x for x in issues if start <= x["created"] <= end]
     kept = [x for x in this_week if not spam.is_spam(x)]
+    both = [x for x in issues if not spam.is_spam(x)]  # W and W-1, for trends
     print(f"fetched {len(issues)} (W {len(this_week)}), spam {len(this_week) - len(kept)}")
 
     if a.recheck:
         md = (d / "brief.md").read_text()
+        labels = json.loads((d / "labels.json").read_text())
     else:
-        labels = classify.classify(kept)
+        labels = classify.classify(both)
         (d / "labels.json").write_text(json.dumps(labels, indent=1))
-        md = brief.write_brief(kept, labels, a.week, len(this_week) - len(kept))
+        md = brief.write_brief(both, labels, a.week, len(this_week) - len(kept))
         (d / "brief.md").write_text(md)
     print("TL;DR within limits:", brief.tldr_ok(md))
 
@@ -44,6 +48,8 @@ def main():
              "method: GitHub search API, rule-based spam filter, Sonnet themes, counted in code, "
              "quotes copied from issue bodies")
     v = check.check_brief(md, a.week, facts=facts)
+    counts = {r["theme"]: r["count"] for r in pain_table(both, labels, a.week, {})}
+    v += quotes.quote_failures(md, both) + quotes.count_failures(md, counts)  # code checks, never skipped
     rate = check.pass_rate(v)
     (d / "check.json").write_text(json.dumps({"pass_rate": rate, "claims": v}, indent=1))
     print(f"checker: {sum(x['verdict'] == 'SUPPORTED' for x in v)}/{len(v)} supported ({rate:.0%})")

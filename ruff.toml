@@ -1,2 +1,0 @@
-# baseline/ is a verbatim copy of 01-discover/cluster.py. Slice 2 refactors it and removes this exclude.
-extend-exclude = ["baseline"]

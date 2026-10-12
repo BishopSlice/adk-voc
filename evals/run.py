@@ -28,6 +28,11 @@ def run_classify(cases):
     for c in cases:
         if got.get(c["url"]) not in [c["gold"], *c["also_ok"]]:
             print(f"    miss {c['id']}: {c['title'][:70]!r} gold={c['gold']} got={got.get(c['url'])}")
+    from baseline.cluster import rules_classify
+    rules = rules_classify(cases)
+    r = sum(rules[c["url"]] in [c["gold"], *c["also_ok"]] for c in cases) / len(cases)
+    m = sum(got.get(c["url"]) in [c["gold"], *c["also_ok"]] for c in cases) / len(cases)
+    print(f"    keyword rules {r:.0%}; classifier margin {(m - r) * 100:+.0f} pts (bar +5)")
     return [(c["gold"], got.get(c["url"]) in [c["gold"], *c["also_ok"]]) for c in cases]
 
 
