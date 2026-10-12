@@ -7,7 +7,8 @@ class ClaudeError(RuntimeError):
 
 
 def ask_claude(prompt: str, model: str) -> str:
-    out = subprocess.run(["claude", "-p", "--model", model], input=prompt,
+    # --tools "": no tools at all, so injected issue text cannot read files or run commands.
+    out = subprocess.run(["claude", "-p", "--model", model, "--tools", ""], input=prompt,
                          capture_output=True, text=True, timeout=900)
     if out.returncode != 0:
         raise ClaudeError(out.stderr.strip() or out.stdout.strip())

@@ -17,4 +17,7 @@ DATA (one row per classified issue: created, repo, theme, comments, url):
 RUN FACTS (recorded by the pipeline code). Use them ONLY for these claim types: issues fetched, spam removed, issues classified, repos covered, date window, the method steps, the pain formula and the severity weights listed. Any other claim needs SOURCES or DATA:
 {facts}
 
-Reply with only a JSON array: [{{"id": "...", "claim": "...", "verdict": "SUPPORTED|NOT_SUPPORTED|UNSURE", "reason": "..."}}]
+- For every SUPPORTED claim, put the exact source text, data rows or run fact you relied on in "evidence". A SUPPORTED verdict with empty evidence counts as NOT_SUPPORTED.
+- Red-flag lines are claims: SUPPORTED only if the cited issue really reports that problem.
+
+Reply with only a JSON array: [{{"id": "...", "claim": "...", "verdict": "SUPPORTED|NOT_SUPPORTED|UNSURE", "reason": "...", "evidence": "..."}}]

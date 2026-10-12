@@ -12,6 +12,18 @@ HERE = Path(__file__).resolve().parent
 SHORT = {"adk-python": "py", "adk-go": "go", "adk-java": "java", "adk-js": "js", "adk-docs": "docs"}
 
 
+def foreign_links(md: str, issues: list[dict]) -> list[str]:
+    """Any link that isn't one of this run's issues (an injection could plant one)."""
+    ok = {x["url"] for x in issues} | {"#method"}
+    return [u for u in re.findall(r"\]\(([^)]+)\)", md) if u not in ok]
+
+
+def insert_sections(md: str, red_flags_md: str, since_md: str) -> str:
+    """Code-rendered sections go in fixed places: Red flags before Top 5, Since release before Method."""
+    md = md.replace("## Top 5 themes", red_flags_md + "\n## Top 5 themes", 1)
+    return md.replace("## Method", since_md + "\n## Method", 1)
+
+
 def tldr_ok(md: str) -> bool:
     m = re.search(r"^## TL;DR\n(.*?)(?=^## )", md, re.S | re.M)
     if not m:
@@ -21,7 +33,7 @@ def tldr_ok(md: str) -> bool:
     return 0 < len(lines) <= 5 and all(len(x) < 120 for x in visible)
 
 
-def write_brief(issues, labels, monday, spam_count, ask=ask_claude) -> str:
+def write_brief(issues, labels, monday, spam_count, ask=ask_claude, flags=None, release_note="") -> str:
     cfg = yaml.safe_load(open(HERE / "config.yaml"))
     ranked = pain_table(issues, labels, monday, cfg["themes"])
     by_url = {x["url"]: x for x in issues}
@@ -38,5 +50,7 @@ def write_brief(issues, labels, monday, spam_count, ask=ask_claude) -> str:
         end=(dt.date.fromisoformat(monday) + dt.timedelta(days=6)).isoformat(),
         header=f"{week_n} new issues across {len(cfg['repos'])} repos ({spam_count} spam removed)",
         stats=stat_lines, issues="\n".join(cand),
-        weights=" · ".join(f"{t} {w}" for t, w in cfg["themes"].items()))
+        weights=" · ".join(f"{t} {w}" for t, w in cfg["themes"].items()),
+        flags="\n".join(f"- {u}: {w}" for u, w in (flags or {}).items()) or "none",
+        release=release_note or "none")
     return ask(prompt, cfg["models"]["maker"]).strip() + "\n"

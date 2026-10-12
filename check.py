@@ -16,6 +16,8 @@ CACHE = HERE / "data" / "cache.json"  # never inside DATA when DATA points at a 
 def parse_verdicts(raw: str) -> list[dict]:
     v = json.loads(raw[raw.index("["):raw.rindex("]") + 1])
     for x in v:
+        if x["verdict"] == "SUPPORTED" and not str(x.get("evidence", "")).strip():
+            x["verdict"], x["reason"] = "NOT_SUPPORTED", "no evidence quoted: " + x.get("reason", "")
         if x["verdict"] != "SUPPORTED":
             x["verdict"] = "NOT_SUPPORTED"  # unsure counts as not supported
     return v

@@ -2,7 +2,7 @@ from check import parse_verdicts, pass_rate
 
 
 def test_parse_and_unsure_counts_as_not_supported():
-    raw = 'noise\n[{"id":"c1","claim":"x","verdict":"SUPPORTED","reason":"r"},' \
+    raw = 'noise\n[{"id":"c1","claim":"x","verdict":"SUPPORTED","reason":"r","evidence":"e"},' \
           '{"id":"c2","claim":"y","verdict":"UNSURE","reason":"r"}]\n'
     v = parse_verdicts(raw)
     assert [x["verdict"] for x in v] == ["SUPPORTED", "NOT_SUPPORTED"]
