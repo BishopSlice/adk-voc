@@ -12,3 +12,9 @@ def ask_claude(prompt: str, model: str) -> str:
     if out.returncode != 0:
         raise ClaudeError(out.stderr.strip() or out.stdout.strip())
     return out.stdout
+
+
+def fence(text: str) -> str:
+    """Untrusted issue text can't close our data tags."""
+    import re
+    return re.sub(r"</?\s*(issue|source)\b[^>]*>", "[tag removed]", text, flags=re.I)

@@ -4,10 +4,12 @@ import json
 import subprocess
 import time
 import urllib.parse
+from pathlib import Path
 
 import yaml
 
 API = "https://api.github.com/search/issues"
+HERE = Path(__file__).resolve().parent
 
 
 class CountMismatch(RuntimeError):
@@ -41,7 +43,10 @@ def curl_get(query: str, page: int) -> dict:
     for attempt in range(3):
         out = subprocess.run(["curl", "-sS", "-H", "Accept: application/vnd.github+json", url],
                              capture_output=True, text=True, timeout=60)
-        data = json.loads(out.stdout or "{}")
+        try:
+            data = json.loads(out.stdout or "{}")
+        except ValueError:
+            data = {"message": "non-JSON response"}
         if "items" in data:
             time.sleep(7)  # stay under 10 search requests per minute
             return data
@@ -67,5 +72,5 @@ def fetch_week(monday: str, get=curl_get) -> list[dict]:
     """Issues created in W and W-1, all repos in config.yaml."""
     prev = (dt.date.fromisoformat(monday) - dt.timedelta(days=7)).isoformat()
     _, end = week_bounds(monday)
-    repos = yaml.safe_load(open("config.yaml"))["repos"]
+    repos = yaml.safe_load(open(HERE / "config.yaml"))["repos"]
     return [x for r in repos for x in fetch_repo(r, prev, end, get)]

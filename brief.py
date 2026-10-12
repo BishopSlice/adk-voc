@@ -6,7 +6,7 @@ from pathlib import Path
 
 import yaml
 
-from llm import ask_claude
+from llm import ask_claude, fence
 
 HERE = Path(__file__).resolve().parent
 SHORT = {"adk-python": "py", "adk-go": "go", "adk-java": "java", "adk-js": "js", "adk-docs": "docs"}
@@ -44,15 +44,15 @@ def write_brief(issues, labels, monday, spam_count, ask=ask_claude) -> str:
     by_url = {x["url"]: x for x in issues}
     week_n = sum(v["count"] for v in stats.values())
     stat_lines = "\n".join(f"- {t}: {v['count']}, repos "
-                           f"{', '.join(SHORT[r] for r in v['repos'])}" for t, v in ranked)
+                           f"{', '.join(SHORT.get(r, r) for r in v['repos'])}" for t, v in ranked)
     cand = []
     for t, v in ranked[:5]:
         cand.append(f"\n### {t}")
         top = sorted(v["urls"], key=lambda u: -by_url[u]["comments"])[:4]
-        cand += [f"- {u} | {by_url[u]['title']} | {by_url[u]['body'][:600]!r}" for u in top]
+        cand += [f"- {u} | {fence(by_url[u]['title'])} | {fence(by_url[u]['body'][:600])!r}" for u in top]
     prompt = (HERE / "prompts" / "brief.md").read_text().format(
         style=(HERE / "prompts" / "style.md").read_text(), week=monday,
         end=(dt.date.fromisoformat(monday) + dt.timedelta(days=6)).isoformat(),
-        header=f"{week_n} new issues across {len({x['repo'] for x in issues})} repos ({spam_count} spam removed)",
+        header=f"{week_n} new issues across {len(cfg['repos'])} repos ({spam_count} spam removed)",
         stats=stat_lines, issues="\n".join(cand))
     return ask(prompt, cfg["models"]["maker"]).strip() + "\n"

@@ -3,14 +3,14 @@ from pathlib import Path
 
 import yaml
 
-from llm import ask_claude
+from llm import ask_claude, fence
 
 HERE = Path(__file__).resolve().parent
 THEMES = list(yaml.safe_load(open(HERE / "config.yaml"))["themes"])
 
 
 def build_prompt(issues: list[dict]) -> str:
-    blocks = "\n".join(f'<issue id="{i}">\n{x["title"]}\n\n{x["body"][:800]}\n</issue>'
+    blocks = "\n".join(f'<issue id="{i}">\n{fence(x["title"])}\n\n{fence(x["body"][:800])}\n</issue>'
                        for i, x in enumerate(issues, 1))
     tpl = (HERE / "prompts" / "classify.md").read_text()
     return tpl.format(themes=(HERE / "prompts" / "themes.md").read_text(), issues=blocks)

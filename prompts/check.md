@@ -14,7 +14,7 @@ SOURCES (issue bodies):
 DATA (one row per classified issue: created, repo, theme, url):
 {data}
 
-RUN FACTS (recorded by the pipeline code; treat as true for claims about the run itself, like spam counts or the method):
+RUN FACTS (recorded by the pipeline code). Use them ONLY for these claim types: issues fetched, spam removed, issues classified, repos covered, date window, and the method steps listed. Any other claim needs SOURCES or DATA:
 {facts}
 
 Reply with only a JSON array: [{{"id": "...", "claim": "...", "verdict": "SUPPORTED|NOT_SUPPORTED|UNSURE", "reason": "..."}}]
