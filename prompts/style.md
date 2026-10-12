@@ -1,0 +1,6 @@
+- Tone: terse, cited, calm. No emojis, no adjectives like "alarming" or "exciting".
+- Links: [py#7394: short title](url). Short repo names: py, go, java, js, docs.
+- Trends: "▲ +N%", "▼ −N%", "– 0%". Use "▲ a → b" when last week's count was under 5. "new" if last week was 0.
+- Quote: a line starting with > and the exact text in quotation marks, then the source link on the next line.
+- Numbers: whole numbers for counts, % with no decimals. Dates: YYYY-MM-DD.
+- Every claim has at least one issue link.

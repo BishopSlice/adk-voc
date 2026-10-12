@@ -25,12 +25,16 @@ def load(name, split):
 def run_classify(cases):
     from classify import classify  # classify(list[issue]) -> {url: theme}
     got = classify(cases)
+    for c in cases:
+        if got.get(c["url"]) not in [c["gold"], *c["also_ok"]]:
+            print(f"    miss {c['id']}: {c['title'][:70]!r} gold={c['gold']} got={got.get(c['url'])}")
     return [(c["gold"], got.get(c["url"]) in [c["gold"], *c["also_ok"]]) for c in cases]
 
 
 def run_checker(cases):
-    from check import check_claims  # check_claims(list[claim]) -> {claim_id: verdict}
-    got = check_claims(cases)
+    import check  # check_claims(list[claim]) -> {claim_id: verdict}
+    check.DATA = ROOT / "fixtures"  # frozen data, so count goldens never drift
+    got = check.check_claims(cases)
     return [(c["slice"], got.get(c["id"]) == c["gold"]) for c in cases]
 
 
