@@ -64,6 +64,24 @@ def foreign_links(md: str, issues: list[dict]) -> list[str]:
     return [u for u in re.findall(r"\]\(([^)]+)\)", md) if u not in ok]
 
 
+def split_code_sections(md: str) -> tuple[str, str, str]:
+    """Lift out the code-rendered sections so the maker can't edit them during a revision."""
+    def cut(text, h):
+        m = re.search(rf"^{re.escape(h)}\n.*?(?=^## |\Z)", text, re.S | re.M)
+        return (text[:m.start()] + text[m.end():], m[0]) if m else (text, "")
+    md, rf = cut(md, "## Red flags")
+    md, since = cut(md, "## Since last release")
+    return md, rf, since
+
+
+def revise(md: str, failures: list[dict], ask=ask_claude) -> str:
+    body, rf, since = split_code_sections(md)
+    model = yaml.safe_load(open(HERE / "config.yaml"))["models"]["maker"]
+    probs = "\n".join(f"- {f.get('claim', '')}: {f.get('reason', '')}" for f in failures)
+    prompt = (HERE / "prompts" / "revise.md").read_text().format(failures=fence(probs), brief=body)
+    return insert_sections(ask(prompt, model).strip() + "\n", rf, since)
+
+
 def insert_sections(md: str, red_flags_md: str, since_md: str) -> str:
     """Code-rendered sections go in fixed places: Red flags before Top 5, Since release before Method."""
     for h in ("## Red flags", "## Since last release"):

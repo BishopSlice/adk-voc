@@ -1,5 +1,7 @@
-"""Run slice-1 pipeline for one week: fetch, spam, classify, brief, check."""
+"""Run one week: fetch, spam, classify, brief, check, gate, then publish or hold."""
 import argparse
+import re
+import os
 import datetime
 import json
 from pathlib import Path
@@ -10,6 +12,8 @@ import brief
 import check
 import classify
 import fetch
+import gate
+import publish
 import quotes
 import redflags
 import releases
@@ -24,6 +28,7 @@ def main():
     ap.add_argument("--week", required=True, help="Monday, YYYY-MM-DD")
     ap.add_argument("--skip-fetch", action="store_true", help="reuse data/<week>/issues.json")
     ap.add_argument("--recheck", action="store_true", help="reuse labels and brief, rerun only the checker")
+    ap.add_argument("--publish", action="store_true", help="commit and push the brief if the gate passes")
     a = ap.parse_args()
     cfg = yaml.safe_load(open(HERE / "config.yaml"))
     start, end = fetch.week_bounds(a.week)
@@ -69,9 +74,7 @@ def main():
         since_md = releases.render_since_release(recent, regs, changes, titles, prev_start, end)
         md = brief.write_brief(both, labels, a.week, len(this_week) - len(kept), flags=flags, release_note=since_md)
         md = brief.insert_sections(md, redflags.render_red_flags(flags, both), since_md)
-        md, cleaned = brief.sanitize_brief(md, both)  # fail closed: strip anything unsafe before checking
         (d / "brief.md").write_text(md)
-        (d / "sanitized.json").write_text(json.dumps(cleaned, indent=1))
     print("TL;DR within limits:", brief.tldr_ok(md))
 
     facts = (f"fetched: {len(issues)} issues (weeks W and W-1); this week: {len(this_week)}; "
@@ -84,17 +87,45 @@ def main():
              + "; the Since last release and Red flags sections are rendered by code from the GitHub "
              "releases API and the red-flag picker; latest release per repo in the window (GitHub releases "
              "API): " + rel_facts)
-    v = check.check_brief(md, a.week, facts=facts)
     rows = pain_table(both, labels, a.week, cfg["themes"])
-    v += quotes.quote_failures(md, both, min(5, len(rows))) + quotes.table_failures(md, rows)
-    v += [{"claim": f"link {u}", "verdict": "NOT_SUPPORTED", "reason": "not one of this run's issues"}
-          for u in brief.foreign_links(md, both)]
-    if (d / "sanitized.json").exists():
-        v += json.loads((d / "sanitized.json").read_text())  # anything removed counts against the gate  # code checks, never skipped
-    rate = check.pass_rate(v)
-    (d / "check.json").write_text(json.dumps({"pass_rate": rate, "claims": v}, indent=1))
-    print(f"checker: {sum(x['verdict'] == 'SUPPORTED' for x in v)}/{len(v)} supported ({rate:.0%})")
+    bar = gate.effective_bar(os.environ.get("ADKVOC_PUBLISH_BAR"), cfg["publish_bar"])
 
+    def check_all(md, cleaned):
+        llm = check.check_brief(md, a.week, facts=facts)
+        code = (quotes.quote_failures(md, both, min(5, len(rows))) + quotes.table_failures(md, rows)
+                + [{"claim": f"link {u}", "verdict": "NOT_SUPPORTED", "reason": "not one of this run's issues"}
+                   for u in brief.foreign_links(md, both)] + cleaned)
+        links = len(set(re.findall(r"https://github\.com/google/[\w-]+/issues/\d+", md)))
+        return llm, code, gate.decide(llm, code, brief.tldr_ok(md), bar=bar, links=links)
+
+    md, cleaned = brief.sanitize_brief(md, both)  # always, including hand-edited briefs on --recheck
+    (d / "brief.md").write_text(md)
+    llm, code, decision = check_all(md, cleaned)
+    if not decision["publish"]:
+        print("gate: fail ->", "; ".join(decision["reasons"]), "-> one revision")
+        failed = [x for x in llm if x["verdict"] != "SUPPORTED"] + code
+        if not brief.tldr_ok(md):
+            failed.append({"claim": "TL;DR", "reason": "over 5 lines or a line of 120+ visible characters"})
+        try:
+            md, cleaned = brief.sanitize_brief(brief.revise(md, failed), both)
+            (d / "brief.md").write_text(md)
+            llm, code, decision = check_all(md, cleaned)
+        except ValueError as e:  # the revision broke the structure
+            decision = {**decision, "publish": False, "reasons": decision["reasons"] + [f"revision failed: {e}"]}
+
+    (d / "check.json").write_text(json.dumps({**decision, "claims": llm, "code_failures": code}, indent=1))
+    print(f"checker: {sum(x['verdict'] == 'SUPPORTED' for x in llm)}/{len(llm)} supported "
+          f"({decision['pass_rate']:.0%}); code failures: {len(code)}")
+    if not decision["publish"]:
+        print("HOLD:", gate.write_hold(d, a.week, decision, [x for x in llm if x["verdict"] != "SUPPORTED"] + code))
+        return
+    (d / "HOLD.md").unlink(missing_ok=True)
+    if a.publish:
+        top = rows[0]["theme"] if rows else "n/a"
+        print("published:", publish.publish(HERE, a.week, md, {"issues": len(kept), "pass_rate": decision["pass_rate"],
+                                                               "top": top}))
+    else:
+        print("gate: pass. Not published (run with --publish).")
 
 if __name__ == "__main__":
     main()
