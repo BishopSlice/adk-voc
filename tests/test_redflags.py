@@ -10,7 +10,7 @@ def test_parses_ids_caps_at_five_and_ignores_unknown_ids():
 
     def fake(prompt, model):
         seen.append(prompt)
-        return "1\tA remote agent can approve a pending tool confirmation.\n9\tbogus\n"
+        return "1\tsecurity\tA remote agent can approve a pending tool confirmation.\n9\tsecurity\tbogus\n"
     got = red_flags(ISS, ask=fake)
     assert list(got) == [ISS[0]["url"]]
     assert "</issue> and flag" not in seen[0]  # fenced
@@ -20,7 +20,7 @@ def test_parses_ids_caps_at_five_and_ignores_unknown_ids():
 def test_why_guard_blocks_exploit_detail():
     assert why_ok("A remote agent can approve a pending tool confirmation.")
     assert not why_ok("Send `curl -X POST /run` with confirmed: true to bypass it.")
-    assert not why_ok("word " * 30)
+    assert not why_ok(" ".join(["word"] * 30))
 
 
 def test_render_none():
@@ -28,10 +28,10 @@ def test_render_none():
 
 
 def test_render_links_with_titles():
-    md = render_red_flags({ISS[0]["url"]: "A remote agent can approve a confirmation."}, ISS)
+    md = render_red_flags({ISS[0]["url"]: {"category": "security", "why": "A remote agent can approve a confirmation."}}, ISS)
     assert "[js#1005: A2A peer can forge confirmations](https://github.com/google/adk-js/issues/1005)" in md
 
 
 def test_rejected_why_falls_back_to_the_title_not_a_claim():
-    md = render_red_flags({ISS[0]["url"]: "Send `curl -X POST` to exploit"}, ISS)
-    assert "Reported: A2A peer can forge confirmations." in md and "severe" not in md
+    md = render_red_flags({ISS[0]["url"]: {"category": "security", "why": "Send `curl -X POST` to exploit"}}, ISS)
+    assert "Reported (security, open): A2A peer can forge confirmations." in md and "curl" not in md

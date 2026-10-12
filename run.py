@@ -68,7 +68,9 @@ def main():
         since_md = releases.render_since_release(recent, regs, changes, titles)
         md = brief.write_brief(both, labels, a.week, len(this_week) - len(kept), flags=flags, release_note=since_md)
         md = brief.insert_sections(md, redflags.render_red_flags(flags, both), since_md)
+        md, cleaned = brief.sanitize_brief(md, both)  # fail closed: strip anything unsafe before checking
         (d / "brief.md").write_text(md)
+        (d / "sanitized.json").write_text(json.dumps(cleaned, indent=1))
     print("TL;DR within limits:", brief.tldr_ok(md))
 
     facts = (f"fetched: {len(issues)} issues (weeks W and W-1); this week: {len(this_week)}; "
@@ -84,7 +86,9 @@ def main():
     rows = pain_table(both, labels, a.week, cfg["themes"])
     v += quotes.quote_failures(md, both, min(5, len(rows))) + quotes.table_failures(md, rows)
     v += [{"claim": f"link {u}", "verdict": "NOT_SUPPORTED", "reason": "not one of this run's issues"}
-          for u in brief.foreign_links(md, both)]  # code checks, never skipped
+          for u in brief.foreign_links(md, both)]
+    if (d / "sanitized.json").exists():
+        v += json.loads((d / "sanitized.json").read_text())  # anything removed counts against the gate  # code checks, never skipped
     rate = check.pass_rate(v)
     (d / "check.json").write_text(json.dumps({"pass_rate": rate, "claims": v}, indent=1))
     print(f"checker: {sum(x['verdict'] == 'SUPPORTED' for x in v)}/{len(v)} supported ({rate:.0%})")

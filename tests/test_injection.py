@@ -28,3 +28,12 @@ def test_sections_are_inserted_in_fixed_places():
     md = "# T\n## TL;DR\n- a\n## Top 5 themes\nx\n## Method\ny\n"
     out = insert_sections(md, "## Red flags\nRF\n", "## Since last release\nSR\n")
     assert out.index("## Red flags") < out.index("## Top 5") < out.index("## Since last") < out.index("## Method")
+
+
+def test_missing_headings_fail_loudly():
+    import pytest
+    from brief import insert_sections
+    with pytest.raises(ValueError):
+        insert_sections("# T\n## TL;DR\n- a\n## Method\n", "## Red flags\n", "## Since last release\n")
+    with pytest.raises(ValueError):
+        insert_sections("## Red flags\nx\n## Top 5 themes\n## Method\n", "## Red flags\n", "## Since\n")

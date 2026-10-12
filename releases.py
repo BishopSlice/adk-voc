@@ -5,7 +5,7 @@ import re
 import subprocess
 from collections import Counter
 
-SHORT = {"adk-python": "py", "adk-go": "go", "adk-java": "java", "adk-js": "js", "adk-docs": "docs"}
+from brief import SHORT
 
 
 def fetch_releases(repo: str) -> list[dict]:
@@ -13,6 +13,8 @@ def fetch_releases(repo: str) -> list[dict]:
                          capture_output=True, text=True, timeout=60)
     try:
         data = json.loads(out.stdout)
+        if not isinstance(data, list):
+            raise TypeError(data)
         return [{"tag": r["tag_name"], "date": r["published_at"][:10]} for r in data if r.get("published_at")]
     except (ValueError, KeyError, TypeError):
         raise RuntimeError(f"GitHub releases fetch failed for {repo}")
@@ -26,27 +28,50 @@ def recent_release(releases: list[dict], monday: str) -> dict | None:
     return max(inside, key=lambda r: r["date"]) if inside else None
 
 
+def semver(tag: str) -> str | None:
+    """2.11.0 from v2.11.0 or main-v2.11.0. None for prereleases like v2.12.0-rc.1."""
+    m = re.search(r"(\d+\.\d+\.\d+)(-[\w.]+)?$", tag)
+    return m[1] if m and not m[2] else None
+
+
+NEG = re.compile(r"\b(not|no|isn't|wasn't)\s+(a\s+)?regress", re.I)
+FAIL = re.compile(r"\b(regress\w*|broke|broken|break[s]?|fail\w*|error\w*|crash\w*|hang\w*|404\w*|no longer|"
+                  r"stopped|missing|not called|drops?|lost)\b", re.I)
+
+
 def regressions(issues: list[dict], version: str) -> set:
-    v = re.escape(version.lstrip("v"))
-    pat = re.compile(rf"(regress\w*[^.\n]{{0,40}}\bv?{v}(?!\d|\.\d)|\bsince\s+v?{v}(?!\d|\.\d)|"
-                     rf"after\s+(upgrading|updating)\s+to\s+v?{v}(?!\d|\.\d)|\bv?{v}(?!\d|\.\d)[^.\n]{{0,30}}regress)",
-                     re.I)
-    return {x["url"] for x in issues if pat.search(x["title"] + "\n" + x["body"])}
+    """Issues whose reporter says something broke in this version. Reporter-stated, not confirmed."""
+    v = re.escape(semver(version) or version.lstrip("v"))
+    ver = rf"(?<![\d.])v?{v}(?![\w]|\.\d)"
+    out = set()
+    for x in issues:
+        for sent in re.split(r"(?<=[.!?\n])\s+", x["title"] + "\n" + x["body"]):
+            if not re.search(ver, sent) or NEG.search(sent):
+                continue
+            cue = re.search(rf"regress\w*[^.\n]{{0,40}}{ver}|{ver}[^.\n]{{0,30}}regress|"
+                            rf"after\s+(upgrading|updating)\s+to\s+{ver}|broken\s+in\s+{ver}", sent, re.I)
+            if cue or (re.search(rf"\bsince\s+{ver}", sent, re.I) and FAIL.search(sent)):
+                out.add(x["url"])
+                break
+    return out
 
 
-def rate_changes(issues, labels, release_date, start, end, min_after=3) -> list[dict]:
-    """Themes whose issues per day at least doubled (or halved) after the release."""
+def rate_changes(issues, labels, release_date, start, end, min_after=5) -> list[dict]:
+    """Themes with at least 2x the issues in an equal-length window after the release."""
     d = dt.date.fromisoformat
-    days_before = (d(release_date) - d(start)).days
-    days_after = (d(end) - d(release_date)).days + 1
-    if days_before < 3 or days_after < 3:
+    days = min((d(release_date) - d(start)).days, (d(end) - d(release_date)).days + 1)
+    if days < 3:
         return []
-    before = Counter(labels[x["url"]] for x in issues if x["url"] in labels and x["created"] < release_date)
-    after = Counter(labels[x["url"]] for x in issues if x["url"] in labels and x["created"] >= release_date)
+    days_before = days_after = days
+    lo = (d(release_date) - dt.timedelta(days=days)).isoformat()
+    hi = (d(release_date) + dt.timedelta(days=days - 1)).isoformat()
+    start, end = lo, hi
+    before = Counter(labels[x["url"]] for x in issues if x["url"] in labels and lo <= x["created"] < release_date)
+    after = Counter(labels[x["url"]] for x in issues if x["url"] in labels and release_date <= x["created"] <= hi)
     out = []
     for t in sorted(set(before) | set(after)):
         rb, ra = before[t] / days_before, after[t] / days_after
-        if after[t] >= min_after and (rb == 0 or ra / rb >= 2):
+        if after[t] >= min_after and ra >= 2 * rb:
             last_before = (d(release_date) - dt.timedelta(days=1)).isoformat()
             out.append({"theme": t, "before": before[t], "after": after[t], "days_before": days_before,
                         "days_after": days_after, "start": start, "last_before": last_before,
@@ -65,13 +90,13 @@ def render_since_release(recent: dict, regs: dict, changes: dict, titles: dict |
         lines.append(f"**{repo} {rel['tag']}, released {rel['date']}**")
         for u in regs.get(repo, []):
             n = u.rsplit("/", 1)[1]
-            lines.append(f"- Regression reported: [{SHORT.get(repo, repo)}#{n}: {titles.get(u, 'issue')}]({u})")
+            lines.append(f"- Reported regression: [{SHORT.get(repo, repo)}#{n}: {titles.get(u, 'issue')}]({u})")
         for c in changes.get(repo, []):
             lines.append(f"- {c['theme']}: {c['before']} issues in {c['days_before']} days before "
                          f"({c['start']} to {c['last_before']}), {c['after']} in {c['days_after']} days after "
-                         f"({c['release']} to {c['end']}). At least 2x per day.")
+                         f"({c['release']} to {c['end']}). Small counts; not a cause.")
         if not regs.get(repo) and not changes.get(repo):
-            lines.append("- No regressions reported and no theme rate changed 2x or more.")
+            lines.append("- No regressions reported and no theme doubled (5 or more issues).")
         lines.append("")
     if none:
         lines.append(f"{', '.join(none)}: no release in this window.")
