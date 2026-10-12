@@ -64,3 +64,15 @@ def test_spotcheck_samples_five_supported_claims_reproducibly():
     claims = [{"id": f"c{i}", "claim": f"claim {i}", "verdict": "SUPPORTED"} for i in range(20)] + [N]
     a, b = sample(claims, seed=1), sample(claims, seed=1)
     assert len(a) == 5 and a == b and all(c["verdict"] == "SUPPORTED" for c in a)
+
+
+def test_spotcheck_always_includes_a_quote_a_number_and_a_red_flag():
+    from spotcheck import sample, kind
+    claims = ([{"id": f"t{i}", "claim": f"py#{i} is open", "verdict": "SUPPORTED"} for i in range(30)] +
+              [{"id": "q", "claim": 'Quote "the call keeps running" in java#1618', "verdict": "SUPPORTED"},
+               {"id": "n", "claim": "Tools: 14 issues, ▲ +40%", "verdict": "SUPPORTED"},
+               {"id": "r", "claim": "Red flag: py#7464 Reported (security, open): keys can collide", "verdict": "SUPPORTED"}])
+    assert kind(claims[30]) == "quote" and kind(claims[31]) == "number" and kind(claims[32]) == "red flag"
+    for seed in range(5):
+        ids = {c["id"] for c in sample(claims, seed=seed)}
+        assert {"q", "n", "r"} <= ids and len(ids) == 5
