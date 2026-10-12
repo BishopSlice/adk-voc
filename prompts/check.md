@@ -14,4 +14,7 @@ SOURCES (issue bodies):
 DATA (one row per classified issue: created, repo, theme, url):
 {data}
 
+RUN FACTS (recorded by the pipeline code; treat as true for claims about the run itself, like spam counts or the method):
+{facts}
+
 Reply with only a JSON array: [{{"id": "...", "claim": "...", "verdict": "SUPPORTED|NOT_SUPPORTED|UNSURE", "reason": "..."}}]

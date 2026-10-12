@@ -57,20 +57,20 @@ def data_table(monday: str) -> str:
     return "\n".join(f"{x['created']}\t{x['repo']}\t{labels[x['url']]}\t{x['url']}" for x in rows)
 
 
-def _run(task: str, urls: list[str], monday: str | None, ask) -> list[dict]:
+def _run(task: str, urls: list[str], monday: str | None, ask, facts: str = "(none)") -> list[dict]:
     known = _known_issues()
     model = yaml.safe_load(open(HERE / "config.yaml"))["models"]["checker"]
     prompt = (HERE / "prompts" / "check.md").read_text().format(
         task=task, sources="\n".join(source_body(u, known) for u in dict.fromkeys(urls)),
-        data=data_table(monday) if monday else "(none)")
+        data=data_table(monday) if monday else "(none)", facts=facts)
     return parse_verdicts(ask(prompt, model))
 
 
-def check_brief(brief_md: str, monday: str, ask=ask_claude) -> list[dict]:
+def check_brief(brief_md: str, monday: str, ask=ask_claude, facts: str = "(none)") -> list[dict]:
     urls = re.findall(r"https://github\.com/google/[\w-]+/issues/\d+", brief_md)
     task = ("Split the BRIEF into atomic claims (each number, trend, quote, characterization and "
             "link description is one claim; ids c1, c2...). Check each.\n\nBRIEF:\n" + brief_md)
-    return _run(task, urls, monday, ask)
+    return _run(task, urls, monday, ask, facts)
 
 
 def check_claims(claims: list[dict], ask=ask_claude) -> dict:

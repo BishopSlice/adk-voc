@@ -11,3 +11,12 @@ def test_parse_and_unsure_counts_as_not_supported():
 
 def test_empty_is_zero():
     assert pass_rate([]) == 0.0
+
+
+def test_run_facts_reach_the_checker(tmp_path, monkeypatch):
+    import check
+    monkeypatch.setattr(check, "DATA", tmp_path)
+    seen = []
+    check.check_brief("no links", "2026-10-05", ask=lambda p, m: seen.append(p) or "[]",
+                      facts="spam removed: 5")
+    assert "spam removed: 5" in seen[0]

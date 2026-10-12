@@ -33,7 +33,8 @@ def tldr_ok(md: str) -> bool:
     if not m:
         return False
     lines = [x for x in m.group(1).splitlines() if x.strip()]
-    return 0 < len(lines) <= 5 and all(len(x) < 120 for x in lines)
+    visible = [re.sub(r"\]\([^)]*\)", "]", x) for x in lines]  # link targets aren't read
+    return 0 < len(lines) <= 5 and all(len(x) < 120 for x in visible)
 
 
 def write_brief(issues, labels, monday, spam_count, ask=ask_claude) -> str:
