@@ -71,8 +71,10 @@ def test_spotcheck_always_includes_a_quote_a_number_and_a_red_flag():
     claims = ([{"id": f"t{i}", "claim": f"py#{i} is open", "verdict": "SUPPORTED"} for i in range(30)] +
               [{"id": "q", "claim": 'Quote "the call keeps running" in java#1618', "verdict": "SUPPORTED"},
                {"id": "n", "claim": "Tools: 14 issues, ▲ +40%", "verdict": "SUPPORTED"},
-               {"id": "r", "claim": "Red flag: py#7464 Reported (security, open): keys can collide", "verdict": "SUPPORTED"}])
-    assert kind(claims[30]) == "quote" and kind(claims[31]) == "number" and kind(claims[32]) == "red flag"
+               {"id": "r", "claim": "py#7445: failed A2A tasks return raw error text", "verdict": "SUPPORTED"}])
+    flags = {"py#7445"}
+    assert kind(claims[30]) == "quote" and kind(claims[31]) == "number" and kind(claims[32], flags) == "red flag"
+    assert kind({"claim": "py#7445 is open"}, flags) == "other"  # a status line is not the red-flag claim
     for seed in range(5):
-        ids = {c["id"] for c in sample(claims, seed=seed)}
+        ids = {c["id"] for c in sample(claims, seed=seed, flag_refs=flags)}
         assert {"q", "n", "r"} <= ids and len(ids) == 5

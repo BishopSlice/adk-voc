@@ -10,9 +10,12 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 
 
-def kind(c: dict) -> str:
+SHORT = {"adk-python": "py", "adk-go": "go", "adk-java": "java", "adk-js": "js", "adk-docs": "docs"}
+
+
+def kind(c: dict, flag_refs: set = frozenset()) -> str:
     t = c.get("claim", "")
-    if re.search(r"red flag|Reported \(", t, re.I):
+    if any(t.startswith(r + ":") or t.startswith(r + " reporter") for r in flag_refs):
         return "red flag"
     if '"' in t or "\u201c" in t or re.search(r"\bquote", t, re.I):
         return "quote"
@@ -21,13 +24,24 @@ def kind(c: dict) -> str:
     return "other"
 
 
-def sample(claims: list[dict], k: int = 5, seed: int | None = None) -> list[dict]:
+def flag_refs(week_dir: Path) -> set:
+    f = week_dir / "flags.json"
+    if not f.exists():
+        return set()
+    refs = set()
+    for url in [u for u, v in json.loads(f.read_text()).items() for u in [u, *v.get("also", [])]]:
+        m = re.search(r"google/([\w-]+)/issues/(\d+)", url)
+        refs.add(f"{SHORT.get(m[1], m[1])}#{m[2]}")
+    return refs
+
+
+def sample(claims: list[dict], k: int = 5, seed: int | None = None, flag_refs: set = frozenset()) -> list[dict]:
     """At least one quote, one number and one red-flag line when the brief has them; the rest random."""
     rng = random.Random(seed)
     supported = [c for c in claims if c["verdict"] == "SUPPORTED"]
     picked = []
     for want in ("quote", "number", "red flag"):
-        pool = [c for c in supported if kind(c) == want and c not in picked]
+        pool = [c for c in supported if kind(c, flag_refs) == want and c not in picked]
         if pool:
             picked.append(rng.choice(pool))
     rest = [c for c in supported if c not in picked]
@@ -41,8 +55,9 @@ def main():
     a = ap.parse_args()
     d = HERE / "data" / a.week
     if a.agree is None:
-        for c in sample(json.loads((d / "check.json").read_text())["claims"], seed=a.week):
-            print(f"- {c['id']} ({kind(c)}): {c['claim']}\n  evidence: {c.get('evidence', '')[:200]}")
+        refs = flag_refs(d)
+        for c in sample(json.loads((d / "check.json").read_text())["claims"], seed=a.week, flag_refs=refs):
+            print(f"- {c['id']} ({kind(c, refs)}): {c['claim']}\n  evidence: {c.get('evidence', '')[:200]}")
         print(f"\nCheck each against its issue, then run: python3 spotcheck.py --week {a.week} --agree N")
         return
     f = HERE / "data" / "spotcheck.csv"
