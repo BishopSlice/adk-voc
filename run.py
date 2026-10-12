@@ -1,5 +1,6 @@
 """Run one week: fetch, spam, classify, brief, check, gate, then publish or hold."""
 import argparse
+import os
 import datetime
 import json
 from pathlib import Path
@@ -88,13 +89,14 @@ def main():
              "releases API and the red-flag picker; latest release per repo in the window (GitHub releases "
              "API): " + rel_facts)
     rows = pain_table(both, labels, a.week, cfg["themes"])
+    bar = float(os.environ.get("ADKVOC_PUBLISH_BAR", cfg["publish_bar"]))  # env override: forced-fail tests
 
     def check_all(md, cleaned):
         llm = check.check_brief(md, a.week, facts=facts)
         code = [x for x in quotes.quote_failures(md, both, min(5, len(rows))) + quotes.table_failures(md, rows)
                 + [{"claim": f"link {u}", "verdict": "NOT_SUPPORTED", "reason": "not one of this run's issues"}
                    for u in brief.foreign_links(md, both)] + cleaned]
-        return llm, code, gate.decide(llm, code, brief.tldr_ok(md))
+        return llm, code, gate.decide(llm, code, brief.tldr_ok(md), bar=bar)
 
     cleaned = json.loads((d / "sanitized.json").read_text()) if (d / "sanitized.json").exists() else []
     llm, code, decision = check_all(md, cleaned)

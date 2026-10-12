@@ -5,14 +5,14 @@ PUBLISH_BAR = 0.95
 MIN_CLAIMS = 10
 
 
-def decide(llm_verdicts: list[dict], code_failures: list[dict], tldr_ok: bool) -> dict:
+def decide(llm_verdicts: list[dict], code_failures: list[dict], tldr_ok: bool, bar: float = PUBLISH_BAR) -> dict:
     n = len(llm_verdicts)
     rate = sum(v["verdict"] == "SUPPORTED" for v in llm_verdicts) / n if n else 0.0
     reasons = []
     if n < MIN_CLAIMS:
         reasons.append(f"only {n} claims checked (need {MIN_CLAIMS})")
-    if rate < PUBLISH_BAR:
-        reasons.append(f"{rate:.0%} of claims verified (need {PUBLISH_BAR:.0%})")
+    if rate < bar:
+        reasons.append(f"{rate:.0%} of claims verified (need {bar:.0%})")
     if code_failures:
         reasons.append(f"{len(code_failures)} code check failures (quotes, numbers, links or sanitizer)")
     if not tldr_ok:
