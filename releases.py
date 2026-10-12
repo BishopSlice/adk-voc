@@ -47,7 +47,10 @@ def rate_changes(issues, labels, release_date, start, end, min_after=3) -> list[
     for t in sorted(set(before) | set(after)):
         rb, ra = before[t] / days_before, after[t] / days_after
         if after[t] >= min_after and (rb == 0 or ra / rb >= 2):
-            out.append({"theme": t, "before": round(rb, 2), "after": round(ra, 2)})
+            last_before = (d(release_date) - dt.timedelta(days=1)).isoformat()
+            out.append({"theme": t, "before": before[t], "after": after[t], "days_before": days_before,
+                        "days_after": days_after, "start": start, "last_before": last_before,
+                        "release": release_date, "end": end})
     return out
 
 
@@ -64,7 +67,9 @@ def render_since_release(recent: dict, regs: dict, changes: dict, titles: dict |
             n = u.rsplit("/", 1)[1]
             lines.append(f"- Regression reported: [{SHORT.get(repo, repo)}#{n}: {titles.get(u, 'issue')}]({u})")
         for c in changes.get(repo, []):
-            lines.append(f"- {c['theme']}: {c['before']} → {c['after']} issues per day since the release")
+            lines.append(f"- {c['theme']}: {c['before']} issues in {c['days_before']} days before "
+                         f"({c['start']} to {c['last_before']}), {c['after']} in {c['days_after']} days after "
+                         f"({c['release']} to {c['end']}). At least 2x per day.")
         if not regs.get(repo) and not changes.get(repo):
             lines.append("- No regressions reported and no theme rate changed 2x or more.")
         lines.append("")

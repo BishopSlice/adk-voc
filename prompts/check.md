@@ -14,7 +14,7 @@ SOURCES (issue bodies):
 DATA (one row per classified issue: created, repo, theme, comments, url):
 {data}
 
-RUN FACTS (recorded by the pipeline code). Use them ONLY for these claim types: issues fetched, spam removed, issues classified, repos covered, date window, the method steps, the pain formula and the severity weights listed. Any other claim needs SOURCES or DATA:
+RUN FACTS (recorded by the pipeline code). Use them ONLY for these claim types: issues fetched, spam removed, issues classified, repos covered, date window, the method steps, the pain formula, the severity weights, and release tags and dates listed. Any other claim needs SOURCES or DATA:
 {facts}
 
 - For every SUPPORTED claim, put the exact source text, data rows or run fact you relied on in "evidence". A SUPPORTED verdict with empty evidence counts as NOT_SUPPORTED.

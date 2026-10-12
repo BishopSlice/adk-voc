@@ -40,8 +40,11 @@ def main():
     both = [x for x in issues if not spam.is_spam(x)]  # W and W-1, for trends
     print(f"fetched {len(issues)} (W {len(this_week)}), spam {len(this_week) - len(kept)}")
 
+    rel_facts = "(not recorded)"
     if a.recheck:
         md = (d / "brief.md").read_text()
+        if (d / "releases.json").exists():
+            rel_facts = (d / "releases.json").read_text()
         labels = json.loads((d / "labels.json").read_text())
         missing = [x["url"] for x in both if x["url"] not in labels]
         if missing:
@@ -58,6 +61,8 @@ def main():
                 regs[repo] = sorted(releases.regressions(mine, recent[repo]["tag"]))
                 changes[repo] = releases.rate_changes([x for x in both if x["repo"] == repo], labels,
                                                       recent[repo]["date"], prev_start, end)
+        rel_facts = json.dumps({r: v for r, v in recent.items()})
+        (d / "releases.json").write_text(rel_facts)
         titles = {x["url"]: x["title"][:70] for x in both}
         since_md = releases.render_since_release(recent, regs, changes, titles)
         md = brief.write_brief(both, labels, a.week, len(this_week) - len(kept), flags=flags, release_note=since_md)
@@ -72,7 +77,8 @@ def main():
              "(1 + median comments / 10), computed in code; severity weights: "
              + ", ".join(f"{t} {w}" for t, w in cfg["themes"].items())
              + "; the Since last release and Red flags sections are rendered by code from the GitHub "
-             "releases API and the red-flag picker")
+             "releases API and the red-flag picker; latest release per repo in the window (GitHub releases "
+             "API): " + rel_facts)
     v = check.check_brief(md, a.week, facts=facts)
     rows = pain_table(both, labels, a.week, cfg["themes"])
     v += quotes.quote_failures(md, both, min(5, len(rows))) + quotes.table_failures(md, rows)

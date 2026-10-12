@@ -33,3 +33,10 @@ def test_rate_change_needs_2x_and_enough_data():
 def test_render_no_release_is_one_line():
     md = render_since_release({"adk-go": None}, {}, {})
     assert md.strip().endswith("adk-go: no release in this window.")
+
+
+def test_rate_lines_show_counts_and_windows():
+    xs = [i(f"o{k}", "t", created=d) for k, d in enumerate(["2026-10-02", "2026-10-03", "2026-10-06"])]
+    rows = rate_changes(xs, {x["url"]: "Tools" for x in xs}, "2026-10-01", "2026-09-28", "2026-10-11")
+    md = render_since_release({"adk-python": {"tag": "v2.11.0", "date": "2026-10-01"}}, {}, {"adk-python": rows})
+    assert "Tools: 0 issues in 3 days before (2026-09-28 to 2026-09-30), 3 in 11 days after" in md
