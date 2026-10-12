@@ -37,7 +37,7 @@ def render_red_flags(flags: dict, issues: list[dict]) -> str:
         x = by[url]
         repo = re.search(r"google/([\w-]+)/", url)[1]
         n = url.rsplit("/", 1)[1]
-        why = why if why_ok(why) else "Reported as a severe issue. See the linked issue."
+        why = why if why_ok(why) else f"Reported: {x['title'][:90].rstrip('.')}."  # no unverified claim
         lines.append(f"- {why} [{SHORT.get(repo, repo)}#{n}: {x['title'][:70]}]({url})")
     if not flags:
         lines.append("No red flags this week.")

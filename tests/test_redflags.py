@@ -30,3 +30,8 @@ def test_render_none():
 def test_render_links_with_titles():
     md = render_red_flags({ISS[0]["url"]: "A remote agent can approve a confirmation."}, ISS)
     assert "[js#1005: A2A peer can forge confirmations](https://github.com/google/adk-js/issues/1005)" in md
+
+
+def test_rejected_why_falls_back_to_the_title_not_a_claim():
+    md = render_red_flags({ISS[0]["url"]: "Send `curl -X POST` to exploit"}, ISS)
+    assert "Reported: A2A peer can forge confirmations." in md and "severe" not in md

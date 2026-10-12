@@ -53,6 +53,7 @@ def main():
         labels = classify.classify(both)
         (d / "labels.json").write_text(json.dumps(labels, indent=1))
         flags = redflags.red_flags(kept)
+        (d / "flags.json").write_text(json.dumps(flags, indent=1))  # raw lines, before the wording guard
         recent, regs, changes = {}, {}, {}
         for repo in cfg["repos"]:
             recent[repo] = releases.recent_release(releases.fetch_releases(repo), a.week)
