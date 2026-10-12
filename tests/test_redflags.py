@@ -49,7 +49,7 @@ def test_policy_open_only_merged_duplicates_and_triage_note():
                                       "also": [b["url"]]}}, [a, b])
     assert md.count("\n- ") == 1 and "py#7434" in md and "go#1752" in md
     md2 = render_red_flags({b["url"]: {"category": "security", "why": "Keys can collide"}}, [b])
-    assert "Maintainer triage in the issue: low priority." in md2
+    assert "The issue mentions an earlier low-priority triage." in md2
 
 
 def test_parses_duplicate_groups():

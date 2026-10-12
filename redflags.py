@@ -60,7 +60,7 @@ def render_red_flags(flags: dict, issues: list[dict]) -> str:
         for u in f.get("also", []):
             r2, n2 = re.search(r"google/([\w-]+)/", u)[1], u.rsplit("/", 1)[1]
             links.append(f"[{SHORT.get(r2, r2)}#{n2}]({u})")
-        triage = " Maintainer triage in the issue: low priority." if any(
+        triage = " The issue mentions an earlier low-priority triage." if any(
             TRIAGE.search(by.get(u, {}).get("body", "")) for u in [url, *f.get("also", [])]) else ""
         lines.append(f"- Reported ({f['category']}, {state}): {why}.{triage} {' · '.join(links)}")
     if not flags:

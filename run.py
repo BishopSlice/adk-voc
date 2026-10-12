@@ -66,7 +66,7 @@ def main():
                                 "release, both weeks)": regs, "repos": cfg["repos"]})
         (d / "releases.json").write_text(rel_facts)
         titles = {x["url"]: x["title"][:70] for x in both}
-        since_md = releases.render_since_release(recent, regs, changes, titles)
+        since_md = releases.render_since_release(recent, regs, changes, titles, prev_start, end)
         md = brief.write_brief(both, labels, a.week, len(this_week) - len(kept), flags=flags, release_note=since_md)
         md = brief.insert_sections(md, redflags.render_red_flags(flags, both), since_md)
         md, cleaned = brief.sanitize_brief(md, both)  # fail closed: strip anything unsafe before checking
@@ -78,7 +78,8 @@ def main():
              f"spam removed: {len(this_week) - len(kept)}; classified: {len(kept)} this week, {len(both)} across both weeks; "
              "method: GitHub search API, rule-based spam filter, Sonnet themes, counted in code, "
              "quotes copied from issue bodies; pain = issues x severity weight x repos affected x "
-             "(1 + median comments / 10), computed in code; severity weights: "
+             "(1 + median comments / 10), computed in code, higher means more pain, used to rank themes "
+             "within a week; severity weights: "
              + ", ".join(f"{t} {w}" for t, w in cfg["themes"].items())
              + "; the Since last release and Red flags sections are rendered by code from the GitHub "
              "releases API and the red-flag picker; latest release per repo in the window (GitHub releases "

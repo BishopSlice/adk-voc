@@ -53,3 +53,9 @@ def test_error_object_from_api_raises_clear_error(monkeypatch):
     monkeypatch.setattr(releases.subprocess, "run", lambda *a, **k: R())
     with pytest.raises(RuntimeError, match="releases fetch failed"):
         releases.fetch_releases("adk-go")
+
+
+def test_no_change_line_names_its_windows():
+    md = render_since_release({"adk-java": {"tag": "v1.11.0", "date": "2026-10-02"}}, {}, {},
+                              start="2026-09-28", end="2026-10-11")
+    assert "comparing 4 days before and 4 days from the release" in md

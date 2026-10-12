@@ -79,7 +79,13 @@ def rate_changes(issues, labels, release_date, start, end, min_after=5) -> list[
     return out
 
 
-def render_since_release(recent: dict, regs: dict, changes: dict, titles: dict | None = None) -> str:
+def compare_days(release_date: str, start: str, end: str) -> int:
+    d = dt.date.fromisoformat
+    return min((d(release_date) - d(start)).days, (d(end) - d(release_date)).days + 1)
+
+
+def render_since_release(recent: dict, regs: dict, changes: dict, titles: dict | None = None,
+                         start: str = "", end: str = "") -> str:
     """recent: repo -> release or None. regs: repo -> [urls]. changes: repo -> rate_changes rows."""
     titles = titles or {}
     lines, none = ["## Since last release"], []
@@ -96,7 +102,9 @@ def render_since_release(recent: dict, regs: dict, changes: dict, titles: dict |
                          f"({c['start']} to {c['last_before']}), {c['after']} in {c['days_after']} days after "
                          f"({c['release']} to {c['end']}). Small counts; not a cause.")
         if not regs.get(repo) and not changes.get(repo):
-            lines.append("- No regressions reported and no theme doubled (5 or more issues).")
+            n = compare_days(rel["date"], start, end) if start and end else 0
+            window = f" comparing {n} days before and {n} days from the release" if n >= 3 else ""
+            lines.append(f"- No regressions reported. No theme reached 5 or more issues and 2x{window}.")
         lines.append("")
     if none:
         lines.append(f"{', '.join(none)}: no release in this window.")
