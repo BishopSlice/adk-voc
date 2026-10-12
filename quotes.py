@@ -1,4 +1,4 @@
-"""AC5 exact quotes and AC9 count recompute, checked in code (not by an LLM)."""
+"""AC5 exact quotes and AC9 table recompute (issues, trend, pain), checked in code (not by an LLM)."""
 import re
 
 QUOTE = re.compile(r'^> "(.+)"\s*\n(.*)$', re.M)
@@ -23,10 +23,19 @@ def quote_failures(brief_md: str, issues: list[dict]) -> list[dict]:
     return fails
 
 
-def count_failures(brief_md: str, counts: dict) -> list[dict]:
+def table_failures(brief_md: str, rows: list[dict]) -> list[dict]:
+    """Every Top 5 row: issues, trend and pain must equal what score.pain_table computed."""
+    by = {r["theme"]: r for r in rows}
     fails = []
-    for theme, n in re.findall(r"^\|\s*\d+\s*\|\s*([^|]+?)\s*\|\s*(\d+)\s*\|", brief_md, re.M):
-        if counts.get(theme) != int(n):
-            fails.append({"claim": f"{theme}: {n} issues", "verdict": "NOT_SUPPORTED",
-                          "reason": f"recomputed count is {counts.get(theme, 0)}"})
+    pat = r"^\|\s*\d+\s*\|\s*([^|]+?)\s*\|\s*(\d+)\s*\|\s*([^|]+?)\s*\|\s*([\d.]+)\s*\|"
+    for theme, n, tr, pain in re.findall(pat, brief_md, re.M):
+        r = by.get(theme)
+        if r is None:
+            fails.append({"claim": f"theme {theme}", "verdict": "NOT_SUPPORTED", "reason": "not a computed theme"})
+            continue
+        for name, said, real in (("issues", int(n), r["count"]), ("trend", tr, r["trend"]),
+                                 ("pain", float(pain), r["pain"])):
+            if said != real:
+                fails.append({"claim": f"{theme} {name} {said}", "verdict": "NOT_SUPPORTED",
+                              "reason": f"recomputed {name} is {real}"})
     return fails

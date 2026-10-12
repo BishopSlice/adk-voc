@@ -3,6 +3,8 @@ import argparse
 import json
 from pathlib import Path
 
+import yaml
+
 import brief
 import check
 import classify
@@ -20,6 +22,7 @@ def main():
     ap.add_argument("--skip-fetch", action="store_true", help="reuse data/<week>/issues.json")
     ap.add_argument("--recheck", action="store_true", help="reuse labels and brief, rerun only the checker")
     a = ap.parse_args()
+    cfg = yaml.safe_load(open(HERE / "config.yaml"))
     start, end = fetch.week_bounds(a.week)
     d = HERE / "data" / a.week
     d.mkdir(parents=True, exist_ok=True)
@@ -46,10 +49,12 @@ def main():
     facts = (f"fetched: {len(issues)} issues (weeks W and W-1); this week: {len(this_week)}; "
              f"spam removed: {len(this_week) - len(kept)}; classified: {len(kept)}; "
              "method: GitHub search API, rule-based spam filter, Sonnet themes, counted in code, "
-             "quotes copied from issue bodies")
+             "quotes copied from issue bodies; pain = issues x severity weight x repos affected x "
+             "(1 + median comments / 10), computed in code; severity weights: "
+             + ", ".join(f"{t} {w}" for t, w in cfg["themes"].items()))
     v = check.check_brief(md, a.week, facts=facts)
-    counts = {r["theme"]: r["count"] for r in pain_table(both, labels, a.week, {})}
-    v += quotes.quote_failures(md, both) + quotes.count_failures(md, counts)  # code checks, never skipped
+    rows = pain_table(both, labels, a.week, cfg["themes"])
+    v += quotes.quote_failures(md, both) + quotes.table_failures(md, rows)  # code checks, never skipped
     rate = check.pass_rate(v)
     (d / "check.json").write_text(json.dumps({"pass_rate": rate, "claims": v}, indent=1))
     print(f"checker: {sum(x['verdict'] == 'SUPPORTED' for x in v)}/{len(v)} supported ({rate:.0%})")

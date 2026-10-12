@@ -11,10 +11,10 @@ Rules:
 SOURCES (issue bodies):
 {sources}
 
-DATA (one row per classified issue: created, repo, theme, url):
+DATA (one row per classified issue: created, repo, theme, comments, url):
 {data}
 
-RUN FACTS (recorded by the pipeline code). Use them ONLY for these claim types: issues fetched, spam removed, issues classified, repos covered, date window, and the method steps listed. Any other claim needs SOURCES or DATA:
+RUN FACTS (recorded by the pipeline code). Use them ONLY for these claim types: issues fetched, spam removed, issues classified, repos covered, date window, the method steps, the pain formula and the severity weights listed. Any other claim needs SOURCES or DATA:
 {facts}
 
 Reply with only a JSON array: [{{"id": "...", "claim": "...", "verdict": "SUPPORTED|NOT_SUPPORTED|UNSURE", "reason": "..."}}]
