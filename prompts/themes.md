@@ -1,9 +1,9 @@
-- Tools: function tools, OpenAPI, MCP toolsets, tool results and tool config
+- Tools: function tools, OpenAPI, MCP toolsets, tool results and tool config, and feature requests for new tool capabilities (even if they involve auth or payments)
 - Model providers and streaming: model integrations (Gemini, LiteLlm, Claude...), streaming, live/bidi connections
-- Docs, CI and dev setup: documentation, tests, CI, build, dependencies, local dev tooling and dev UI
+- Docs, CI and dev setup: documentation, tests, CI, build, dependencies, local dev tooling and dev UI, and proposals to list a third-party integration in the docs or catalog
 - Sessions, state and memory: session services, state, memory, artifacts and their storage
-- Security, auth and data leaks: credentials, auth, secrets, access control, exposure of sensitive data
-- Multi-agent orchestration: multi-agent, workflow agents (sequential, loop, parallel), sub-agents, graphs, agent transfer
+- Security, auth and data leaks: a defect that exposes credentials or secrets, breaks auth or access control, or leaks sensitive data
+- Multi-agent orchestration: multi-agent, workflow agents (sequential, loop, parallel), sub-agents, AgentTool (an agent called as a tool), graphs, agent transfer
 - Eval, tracing and observability: evaluation, evaluators, tracing, spans, telemetry, logging
 - Human-in-the-loop: tool confirmation, pause and resume for human input
 - Core runtime: runner, invocation context, callbacks, plugins, events, templating

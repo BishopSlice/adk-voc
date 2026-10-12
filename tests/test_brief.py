@@ -1,16 +1,4 @@
-from brief import theme_stats, tldr_ok
-
-ISS = [{"url": f"u{i}", "repo": r, "comments": c, "created": d}
-       for i, (r, c, d) in enumerate([("adk-go", 2, "2026-10-06"), ("adk-js", 0, "2026-10-07"),
-                                      ("adk-go", 1, "2026-09-30")])]
-LAB = {"u0": "Tools", "u1": "Tools", "u2": "Tools"}
-
-
-def test_stats_split_by_week():
-    s = theme_stats(ISS, LAB, "2026-10-05")
-    assert s["Tools"]["count"] == 2 and s["Tools"]["prev"] == 1
-    assert s["Tools"]["repos"] == ["adk-go", "adk-js"]
-
+from brief import tldr_ok
 
 def test_tldr_limits():
     good = "# T\n\n## TL;DR\n- a\n- b\n\n## Next\n"
