@@ -13,6 +13,14 @@ ALLOWED = re.compile(r"[A-Za-z0-9 ,.'’-]+")
 BANNED = re.compile(r"\b(critical|severe|vulnerab\w*|confirmed|alarming|exploit\w*|payload|curl|cve)\b", re.I)
 
 
+TRIAGE = re.compile(r"\b(P[34]|S[34])\b|infeasible|won'?t fix|working as intended", re.I)
+
+
+def open_only(issues: list[dict]) -> list[dict]:
+    """Policy (Vicky, 2026-10-13): closed issues are likely fixed, so they are never red flags."""
+    return [x for x in issues if x.get("state", "open") == "open"]
+
+
 def why_ok(why: str) -> bool:
     """Plain words only (an allowlist), 20 words or fewer, no hype or exploit words (Never boundary)."""
     return 0 < len(why.split()) <= 20 and bool(ALLOWED.fullmatch(why)) and not BANNED.search(why)
@@ -27,9 +35,14 @@ def red_flags(issues: list[dict], ask=ask_claude) -> dict:
     out = {}
     for line in ask(prompt, model).splitlines():
         parts = [p.strip() for p in line.split("\t")]
-        if len(parts) == 3 and parts[0].isdigit() and 0 < int(parts[0]) <= len(issues) and len(out) < 5:
+        ids = [int(i) for i in parts[0].split(",") if i.strip().isdigit() and 0 < int(i) <= len(issues)] \
+            if len(parts) == 3 else []
+        if ids and len(out) < 5:
             cat = parts[1] if parts[1] in CATEGORIES else "security"
-            out[issues[int(parts[0]) - 1]["url"]] = {"category": cat, "why": parts[2]}
+            f = {"category": cat, "why": parts[2]}
+            if len(ids) > 1:
+                f["also"] = [issues[i - 1]["url"] for i in ids[1:]]  # same bug in other repos
+            out[issues[ids[0] - 1]["url"]] = f
     return out
 
 
@@ -43,7 +56,13 @@ def render_red_flags(flags: dict, issues: list[dict]) -> str:
         title = safe_text(x["title"])[:70]
         why = f["why"].rstrip(".") if why_ok(f["why"]) else title  # the title is a fact the issue shows
         state = x.get("state", "open")
-        lines.append(f"- Reported ({f['category']}, {state}): {why}. [{SHORT.get(repo, repo)}#{n}: {title}]({url})")
+        links = [f"[{SHORT.get(repo, repo)}#{n}: {title}]({url})"]
+        for u in f.get("also", []):
+            r2, n2 = re.search(r"google/([\w-]+)/", u)[1], u.rsplit("/", 1)[1]
+            links.append(f"[{SHORT.get(r2, r2)}#{n2}]({u})")
+        triage = " Maintainer triage in the issue: low priority." if any(
+            TRIAGE.search(by.get(u, {}).get("body", "")) for u in [url, *f.get("also", [])]) else ""
+        lines.append(f"- Reported ({f['category']}, {state}): {why}.{triage} {' · '.join(links)}")
     if not flags:
         lines.append("No red flags this week.")
     return "\n".join(lines) + "\n"
