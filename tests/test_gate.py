@@ -41,7 +41,7 @@ def test_publish_commits_only_the_brief_and_index(tmp_path):
     (repo / "stray.txt").write_text("not allowed")
     pushed = []
     publish(repo, "2026-10-05", "# brief\n", {"issues": 83, "pass_rate": 0.99, "top": "Core runtime"},
-            push=lambda r: pushed.append(r), identity=("t", "t@t"))
+            push=lambda r: pushed.append(r), identity=("t", "t@users.noreply.github.com"))
     files = subprocess.run(["git", "-C", str(repo), "show", "--name-only", "--format="],
                            capture_output=True, text=True).stdout.split()
     assert sorted(files) == ["README.md", "briefs/2026-10-05.md"] and pushed
@@ -56,7 +56,7 @@ def test_publish_refuses_to_overwrite_a_published_week(tmp_path):
     (repo / "briefs").mkdir()
     (repo / "briefs" / "2026-10-05.md").write_text("old")
     with pytest.raises(FileExistsError):
-        publish(repo, "2026-10-05", "new", {"issues": 1, "pass_rate": 1, "top": "x"}, push=print, identity=("t", "t@t"))
+        publish(repo, "2026-10-05", "new", {"issues": 1, "pass_rate": 1, "top": "x"}, push=print, identity=("t", "t@users.noreply.github.com"))
 
 
 def test_spotcheck_samples_five_supported_claims_reproducibly():
