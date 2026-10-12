@@ -39,6 +39,9 @@ def main():
     if a.recheck:
         md = (d / "brief.md").read_text()
         labels = json.loads((d / "labels.json").read_text())
+        missing = [x["url"] for x in both if x["url"] not in labels]
+        if missing:
+            raise SystemExit(f"--recheck: {len(missing)} issues unlabeled (old labels.json?). Rerun without --recheck.")
     else:
         labels = classify.classify(both)
         (d / "labels.json").write_text(json.dumps(labels, indent=1))
@@ -47,14 +50,14 @@ def main():
     print("TL;DR within limits:", brief.tldr_ok(md))
 
     facts = (f"fetched: {len(issues)} issues (weeks W and W-1); this week: {len(this_week)}; "
-             f"spam removed: {len(this_week) - len(kept)}; classified: {len(kept)}; "
+             f"spam removed: {len(this_week) - len(kept)}; classified: {len(kept)} this week, {len(both)} across both weeks; "
              "method: GitHub search API, rule-based spam filter, Sonnet themes, counted in code, "
              "quotes copied from issue bodies; pain = issues x severity weight x repos affected x "
              "(1 + median comments / 10), computed in code; severity weights: "
              + ", ".join(f"{t} {w}" for t, w in cfg["themes"].items()))
     v = check.check_brief(md, a.week, facts=facts)
     rows = pain_table(both, labels, a.week, cfg["themes"])
-    v += quotes.quote_failures(md, both) + quotes.table_failures(md, rows)  # code checks, never skipped
+    v += quotes.quote_failures(md, both, min(5, len(rows))) + quotes.table_failures(md, rows)  # code checks, never skipped
     rate = check.pass_rate(v)
     (d / "check.json").write_text(json.dumps({"pass_rate": rate, "claims": v}, indent=1))
     print(f"checker: {sum(x['verdict'] == 'SUPPORTED' for x in v)}/{len(v)} supported ({rate:.0%})")

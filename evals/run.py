@@ -32,7 +32,11 @@ def run_classify(cases):
     rules = rules_classify(cases)
     r = sum(rules[c["url"]] in [c["gold"], *c["also_ok"]] for c in cases) / len(cases)
     m = sum(got.get(c["url"]) in [c["gold"], *c["also_ok"]] for c in cases) / len(cases)
-    print(f"    keyword rules {r:.0%}; classifier margin {(m - r) * 100:+.0f} pts (bar +5)")
+    strict = sum(got.get(c["url"]) == c["gold"] for c in cases) / len(cases)
+    print(f"    keyword rules {r:.0%}; classifier margin {(m - r) * 100:+.0f} pts (bar +5); "
+          f"strict gold only {strict:.0%}")
+    if m - r < 0.05:
+        return [("margin vs rules below +5 pts", False)]
     return [(c["gold"], got.get(c["url"]) in [c["gold"], *c["also_ok"]]) for c in cases]
 
 

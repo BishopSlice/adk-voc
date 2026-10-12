@@ -17,7 +17,7 @@ def test_pain_formula_matches_hand_math():
 
 def test_ranking_is_deterministic_and_ties_break_by_count_then_name():
     lab = {"u0": "B", "u3": "A"}
-    rows = pain_table(ISS, lab, "2026-10-05", {"A": 1.0, "B": 1.0})
+    rows = pain_table(ISS, lab, "2026-10-05", {"A": 1.0, "B": 1.0})  # every label has a weight
     assert [r["theme"] for r in rows] == ["B", "A"]  # B: 1x1x1x1.2=1.2 > A: 1.1
 
 
@@ -28,3 +28,13 @@ def test_trend_tokens():
     assert trend(8, 15) == "▲ +88%"
     assert trend(6, 5) == "▼ −17%"
     assert trend(9, 9) == "– 0%"
+
+
+def test_tiny_change_rounds_to_flat_not_down():
+    assert trend(300, 301) == "– 0%"
+
+
+def test_unknown_theme_raises():
+    import pytest
+    with pytest.raises(KeyError):
+        pain_table(ISS, {"u0": "Made up"}, "2026-10-05", W)

@@ -20,7 +20,7 @@ def pain_table(issues: list[dict], labels: dict, monday: str, weights: dict) -> 
     for t, xs in cur.items():
         repos = sorted({x["repo"] for x in xs})
         med = statistics.median(x["comments"] for x in xs)
-        pain = round(len(xs) * weights.get(t, 1.0) * len(repos) * (1 + med / 10), 1)
+        pain = round(len(xs) * weights[t] * len(repos) * (1 + med / 10), 1)
         rows.append({"theme": t, "count": len(xs), "prev": prev[t], "repos": repos,
                      "pain": pain, "trend": trend(prev[t], len(xs)), "urls": [x["url"] for x in xs]})
     return sorted(rows, key=lambda r: (-r["pain"], -r["count"], r["theme"]))
@@ -35,4 +35,6 @@ def trend(prev: int, cur: int) -> str:
     if prev < 5:
         return f"{arrow} {prev} → {cur}"
     pct = round((cur - prev) / prev * 100)
+    if pct == 0:
+        return "– 0%"
     return f"▲ +{pct}%" if pct > 0 else f"▼ −{-pct}%"
