@@ -62,7 +62,8 @@ def main():
                 regs[repo] = sorted(releases.regressions(mine, recent[repo]["tag"]))
                 changes[repo] = releases.rate_changes([x for x in both if x["repo"] == repo], labels,
                                                       recent[repo]["date"], prev_start, end)
-        rel_facts = json.dumps({r: v for r, v in recent.items()})
+        rel_facts = json.dumps({"latest_release": recent, "regression_scan_by_code (all issues since each "
+                                "release, both weeks)": regs, "repos": cfg["repos"]})
         (d / "releases.json").write_text(rel_facts)
         titles = {x["url"]: x["title"][:70] for x in both}
         since_md = releases.render_since_release(recent, regs, changes, titles)

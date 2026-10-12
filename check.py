@@ -80,8 +80,8 @@ def data_table(monday: str) -> str:
         return "(none)"
     labels = json.loads((d / "labels.json").read_text())
     rows = [x for x in json.loads((d / "issues.json").read_text()) if x["url"] in labels]
-    return "\n".join(f"{x['created']}\t{x['repo']}\t{labels[x['url']]}\t{x['comments']}\t{x['url']}"
-                     for x in rows)
+    return "\n".join(f"{x['created']}\t{x['repo']}\t{labels[x['url']]}\t{x['comments']}\t"
+                     f"{x.get('state', 'unknown')}\t{x['url']}" for x in rows)
 
 
 def _run(task: str, urls: list[str], monday: str | None, ask, facts: str = "(none)",
