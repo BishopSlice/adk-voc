@@ -7,3 +7,9 @@ One line per real failure: date, what broke, the rule that prevents it.
 - 2026-10-12: a gold label contradicted the theme definitions (c7 artifacts). Rule: gold labels and the theme definitions must be reconciled before tuning.
 - 2026-10-12: the checker failed every pain number because it never saw comments, weights or the formula. Rule: numbers computed in code are verified in code; give the LLM checker every input a claim depends on.
 - 2026-10-12: Sonnet truncated a quote and added a period ("fires again." vs "fires again when the rest arrive."). Rule: the exact-quote check runs in code on every brief; never trust the maker's quotes.
+- 2026-10-13: rate lines like "0.0 → 0.6 per day" had no windows, so nobody could verify them. Rule: every number in the brief shows its inputs (counts and dates).
+- 2026-10-13: a fallback string ("Reported as a severe issue") was itself an unsupported claim. Rule: fallbacks state only facts the source shows, like the title.
+- 2026-10-13: Discover notes said v2.11.0 was released 10-01; the releases API says 10-02. Rule: dates come from the API, never from notes.
+- 2026-10-13: `claude -p --tools ""` still exposed MCP connectors (Google Drive search, read, create). Rule: headless runs on untrusted text use the full LOCKDOWN flags from an empty temp dir, and a test asserts them.
+- 2026-10-13: contract evidence came from a brief generated before the final fixes. Rule: delete outputs and rerun from clean before quoting numbers in a contract.
+- 2026-10-13: an edit that rewrote "from test X to end of file" deleted a later test. Rule: compare test counts before and after editing test files.
