@@ -1,5 +1,6 @@
 """Run slice-1 pipeline for one week: fetch, spam, classify, brief, check."""
 import argparse
+import datetime
 import json
 from pathlib import Path
 
@@ -10,6 +11,8 @@ import check
 import classify
 import fetch
 import quotes
+import redflags
+import releases
 import spam
 from score import pain_table
 
@@ -24,6 +27,7 @@ def main():
     a = ap.parse_args()
     cfg = yaml.safe_load(open(HERE / "config.yaml"))
     start, end = fetch.week_bounds(a.week)
+    prev_start = (datetime.date.fromisoformat(a.week) - datetime.timedelta(days=7)).isoformat()
     d = HERE / "data" / a.week
     d.mkdir(parents=True, exist_ok=True)
 
@@ -45,7 +49,19 @@ def main():
     else:
         labels = classify.classify(both)
         (d / "labels.json").write_text(json.dumps(labels, indent=1))
-        md = brief.write_brief(both, labels, a.week, len(this_week) - len(kept))
+        flags = redflags.red_flags(kept)
+        recent, regs, changes = {}, {}, {}
+        for repo in cfg["repos"]:
+            recent[repo] = releases.recent_release(releases.fetch_releases(repo), a.week)
+            if recent[repo]:
+                mine = [x for x in both if x["repo"] == repo and x["created"] >= recent[repo]["date"]]
+                regs[repo] = sorted(releases.regressions(mine, recent[repo]["tag"]))
+                changes[repo] = releases.rate_changes([x for x in both if x["repo"] == repo], labels,
+                                                      recent[repo]["date"], prev_start, end)
+        titles = {x["url"]: x["title"][:70] for x in both}
+        since_md = releases.render_since_release(recent, regs, changes, titles)
+        md = brief.write_brief(both, labels, a.week, len(this_week) - len(kept), flags=flags, release_note=since_md)
+        md = brief.insert_sections(md, redflags.render_red_flags(flags, both), since_md)
         (d / "brief.md").write_text(md)
     print("TL;DR within limits:", brief.tldr_ok(md))
 
@@ -54,10 +70,14 @@ def main():
              "method: GitHub search API, rule-based spam filter, Sonnet themes, counted in code, "
              "quotes copied from issue bodies; pain = issues x severity weight x repos affected x "
              "(1 + median comments / 10), computed in code; severity weights: "
-             + ", ".join(f"{t} {w}" for t, w in cfg["themes"].items()))
+             + ", ".join(f"{t} {w}" for t, w in cfg["themes"].items())
+             + "; the Since last release and Red flags sections are rendered by code from the GitHub "
+             "releases API and the red-flag picker")
     v = check.check_brief(md, a.week, facts=facts)
     rows = pain_table(both, labels, a.week, cfg["themes"])
-    v += quotes.quote_failures(md, both, min(5, len(rows))) + quotes.table_failures(md, rows)  # code checks, never skipped
+    v += quotes.quote_failures(md, both, min(5, len(rows))) + quotes.table_failures(md, rows)
+    v += [{"claim": f"link {u}", "verdict": "NOT_SUPPORTED", "reason": "not one of this run's issues"}
+          for u in brief.foreign_links(md, both)]  # code checks, never skipped
     rate = check.pass_rate(v)
     (d / "check.json").write_text(json.dumps({"pass_rate": rate, "claims": v}, indent=1))
     print(f"checker: {sum(x['verdict'] == 'SUPPORTED' for x in v)}/{len(v)} supported ({rate:.0%})")
