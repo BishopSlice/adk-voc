@@ -125,6 +125,7 @@ def _fake_week(tmp_path, monkeypatch, ask_error=None):
     import run
     monkeypatch.setattr(run, "HERE", tmp_path)
     (tmp_path / "config.yaml").write_text((APP / "config.yaml").read_text())
+    (tmp_path / "config.approved").write_text((APP / "config.approved").read_text())
     d = tmp_path / "data" / "2026-10-05"
     d.mkdir(parents=True)
     (d / "issues.json").write_text("[]")

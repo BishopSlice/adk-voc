@@ -52,9 +52,15 @@ def sample(claims: list[dict], k: int = 5, seed: int | None = None, flag_refs: s
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--week", required=True)
-    ap.add_argument("--agree", type=int, help="how many of the 5 you agreed with (records it)")
+    ap.add_argument("--agree", type=int, choices=range(6), help="how many of the 5 you agreed with (records it)")
+    ap.add_argument("--checker-fixed", metavar="WHAT", help="record that the checker prompt was fixed (unblocks publishing)")
     a = ap.parse_args()
     d = HERE / "data" / a.week
+    if a.checker_fixed:
+        runlog.append(HERE / "data" / "runs.csv", {"week": a.week, "run_start": dt.date.today().isoformat(),
+                                                   "outcome": "checker-fixed", "note": a.checker_fixed[:200]})
+        print("Recorded. Publishing is unblocked.")
+        return
     if a.agree is None:
         refs = flag_refs(d)
         for c in sample(json.loads((d / "check.json").read_text())["claims"], seed=a.week, flag_refs=refs):

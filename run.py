@@ -67,8 +67,25 @@ def parse_args():
     return ap.parse_args()
 
 
+def human_hold(d, week, row, why, fix):
+    """Stop before spending tokens: something needs a person first."""
+    p = runlog.write_hold(d, week, why, fix)
+    row.update(outcome="hold", note=why[:200])
+    notify.notify(f"HOLD, week {week}", f"{why} See {p}")
+    print("HOLD:", p)
+
+
 def run_week(a, row, ctx):
     cfg = yaml.safe_load(open(HERE / "config.yaml"))
+    d0 = HERE / "data" / a.week
+    changed = gate.config_unapproved(HERE / "config.yaml", HERE / "config.approved")
+    if changed:  # Ask first: themes, weights and sources
+        return human_hold(d0, a.week, row, f"Config {changed}.",
+                          "Review config.yaml, then run `python3 gate.py approve-config --by <name>`.")
+    blocked = runlog.spotcheck_block(HERE / "data" / "runs.csv") if a.publish else None
+    if blocked:  # AC13
+        return human_hold(d0, a.week, row, f"The {blocked}, so the checker needs fixing first.",
+                          "Fix the checker prompt, then run `python3 spotcheck.py --week <W> --checker-fixed \"<what changed>\"`.")
     start, end = fetch.week_bounds(a.week)
     prev_start = (datetime.date.fromisoformat(a.week) - datetime.timedelta(days=7)).isoformat()
     d = HERE / "data" / a.week
@@ -100,19 +117,21 @@ def run_week(a, row, ctx):
         ctx["step"] = "red flags"
         flags = redflags.red_flags(redflags.open_only(kept))
         (d / "flags.json").write_text(json.dumps(flags, indent=1))  # raw lines, before the wording guard
-        recent, regs, changes = {}, {}, {}
+        recent, regs, changes, others = {}, {}, {}, {}
         for repo in cfg["repos"]:
-            recent[repo] = releases.recent_release(releases.fetch_releases(repo), a.week)
+            window = releases.releases_in_window(releases.fetch_releases(repo), a.week)
+            recent[repo], others[repo] = (window[0], window[1:]) if window else (None, [])
             if recent[repo]:
                 mine = [x for x in both if x["repo"] == repo and x["created"] >= recent[repo]["date"]]
                 regs[repo] = sorted(releases.regressions(mine, recent[repo]["tag"]))
                 changes[repo] = releases.rate_changes([x for x in both if x["repo"] == repo], labels,
                                                       recent[repo]["date"], prev_start, end)
-        rel_facts = json.dumps({"latest_release": recent, "regression_scan_by_code (all issues since each "
+        rel_facts = json.dumps({"latest_release": recent, "other_releases_in_window": others,
+                                "regression_scan_by_code (all issues since each "
                                 "release, both weeks)": regs, "repos": cfg["repos"]})
         (d / "releases.json").write_text(rel_facts)
         titles = {x["url"]: x["title"][:70] for x in both}
-        since_md = releases.render_since_release(recent, regs, changes, titles, prev_start, end)
+        since_md = releases.render_since_release(recent, regs, changes, titles, prev_start, end, others=others)
         ctx["step"] = "write"
         md = brief.write_brief(both, labels, a.week, len(this_week) - len(kept), flags=flags, release_note=since_md)
         md = brief.insert_sections(md, redflags.render_red_flags(flags, both), since_md)
@@ -135,6 +154,7 @@ def run_week(a, row, ctx):
     def check_all(md, cleaned):
         llm = check.check_brief(md, a.week, facts=facts)
         code = (quotes.quote_failures(md, both, min(5, len(rows))) + quotes.table_failures(md, rows)
+                + quotes.inline_quote_failures(md, both)
                 + [{"claim": f"link {u}", "verdict": "NOT_SUPPORTED", "reason": "not one of this run's issues"}
                    for u in brief.foreign_links(md, both)] + cleaned)
         links = len(set(re.findall(r"https://github\.com/google/[\w-]+/issues/\d+", md)))

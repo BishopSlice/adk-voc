@@ -41,3 +41,19 @@ python3 run.py --week 2026-10-05 --publish  # also commits briefs/2026-10-05.md 
 python3 evals/run.py                        # evals (calls claude -p)
 python3 spotcheck.py --week 2026-10-05      # 5 random claims to check by hand
 ```
+
+## Weekly schedule (macOS)
+A launchd job runs `run_weekly.sh` on Monday at 09:00, at login and every hour. It only works when a week is due, so the hourly calls catch up after sleep. Each run ends with a row in `data/runs.csv` (pass, hold or error). Holds and errors show a notification.
+
+macOS blocks background jobs under `~/Documents`, so the job runs from a separate clone:
+```
+git clone https://github.com/BishopSlice/adk-voc.git ~/adk-voc
+sed "s|APP_DIR|$HOME/adk-voc|" ~/adk-voc/launchd/com.vicky.adkvoc.plist > ~/Library/LaunchAgents/com.vicky.adkvoc.plist
+launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.vicky.adkvoc.plist
+launchctl print gui/$(id -u)/com.vicky.adkvoc | grep "last exit"   # expect 0
+```
+The clone runs `git pull` before each run, so pushed changes reach the next run. Only the latest full week is caught up. Run an older week by hand: `./run_weekly.sh 2026-10-12`.
+
+## Human steps
+- **Changed themes, weights or repos?** Runs hold until you approve: `python3 gate.py approve-config --by <name>`.
+- **Spot-check disagreed?** Publishing holds until the checker prompt is fixed: `python3 spotcheck.py --week <W> --checker-fixed "<what changed>"`.

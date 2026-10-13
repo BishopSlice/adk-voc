@@ -12,19 +12,27 @@ HERE = Path(__file__).resolve().parent
 SHORT = {"adk-python": "py", "adk-go": "go", "adk-java": "java", "adk-js": "js", "adk-docs": "docs"}
 
 
-MENTION = re.compile(r"(?<![\w`])@(?=[A-Za-z0-9])")
-EXPLOIT = re.compile(r"\b(curl|wget|rm -rf|base64|eval\(|exec\(|payload|exploit|/etc/passwd|"
-                     r"\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})", re.I)
+# Never: personal data. Emails first (they contain @), then @handles, which are removed, not just spaced.
+EMAIL = re.compile(r"(?<![\w/.+-])(?!git@)[\w.+-]+@[A-Za-z0-9-]+(\.[A-Za-z0-9-]+)*\.[A-Za-z]{2,}\b(?!:)")
+MENTION = re.compile(r"(?<![\w`])@[A-Za-z0-9][\w-]*(?![\w-]*/)")  # not @scope/pkg
+# Never: exploit details. Commands, addresses, bypass wording, headers and secrets. A match blocks the brief.
+# Narrow on purpose: matched against prose with link text removed, so issue titles can't hold a week.
+EXPLOIT = re.compile(r"\b(curl|wget|sudo|exploit)\b|rm -rf|eval\(|exec\(|os\.system|/etc/passwd|\.\./\.\./|"
+                     r"\bOR 1=1|\bbypass(es|ed|ing)?\b(?!_)|\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b|"
+                     r"\bX-[A-Za-z-]+\s*:\s*\S|\bset\w* (the )?header|Authorization:\s*\S|"
+                     r"\bBearer\s+[\w.-]{12,}|\b(token|api[_-]?key|password|secret)\s*[=:]\s*(?=\S*\d)[\w.-]{6,}|"
+                     r"\bsk-[\w-]{6,}", re.I)
+LINK_TEXT = re.compile(r"\[[^\]]*\]\([^)]*\)")
 
 
 def safe_text(s: str) -> str:
     """Untrusted text (titles) shown as plain words: no Markdown, HTML or @mentions."""
     s = re.sub(r"[\[\]()<>!`*_|\\#]|//", " ", s)
-    return re.sub(r"\s+", " ", MENTION.sub("@ ", s)).strip()
+    return re.sub(r"\s+", " ", MENTION.sub("someone", EMAIL.sub("an email address", s))).strip()
 
 
 def sanitize_brief(md: str, issues: list[dict]) -> tuple[str, list[dict]]:
-    """Fail closed before publishing: remove HTML, foreign links, @mentions and risky quotes.
+    """Fail closed before publishing: remove HTML, foreign links, personal data and exploit detail.
 
     Returns the cleaned Markdown and one NOT_SUPPORTED row per thing removed."""
     ok = {x["url"] for x in issues}
@@ -48,13 +56,22 @@ def sanitize_brief(md: str, issues: list[dict]) -> tuple[str, list[dict]]:
         if u not in ok:
             bad(u, "bare URL outside this run's issues; removed")
             md = md.replace(u, "")
+    if EMAIL.search(md):
+        bad("email address", "personal data; removed")
+        md = EMAIL.sub("(email removed)", md)
     if MENTION.search(md):
-        bad("@mention", "mentions would ping people; neutralized")
-        md = MENTION.sub("@ ", md)
+        bad("@mention", "username (personal data); removed")
+        md = MENTION.sub("(name removed)", md)
     for q in re.findall(r'^> ["\u201c](.+)["\u201d]', md, re.M):
-        if EXPLOIT.search(q) or len(q) > 300:
-            bad(q, "quote with exploit-style detail or over 300 characters; removed")
+        if len(q) > 300:
+            bad(q, "quote over 300 characters; removed")
             md = md.replace(q, "(quote removed)")
+    lines = md.split("\n")
+    for i, line in enumerate(lines):
+        if EXPLOIT.search(LINK_TEXT.sub(" ", line)):
+            bad(line, "exploit-style detail (command, bypass step, header or secret); line removed")
+            lines[i] = "(line removed: exploit-style detail)"
+    md = "\n".join(lines)
     return md, problems
 
 

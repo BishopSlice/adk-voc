@@ -54,3 +54,20 @@ def table_failures(brief_md: str, rows: list[dict]) -> list[dict]:
                 fails.append({"claim": f"{theme} {name} {said}", "verdict": "NOT_SUPPORTED",
                               "reason": f"recomputed {name} is {real}"})
     return fails
+
+
+INLINE = re.compile(r'(?<![>\w])["“]([^"“”\n]{%d,})["”]' % MIN_QUOTE)
+
+
+def inline_quote_failures(brief_md: str, issues: list[dict]) -> list[dict]:
+    """Never paraphrase inside quotation marks: every quoted phrase in prose appears word for word in an issue."""
+    sources = " ".join(_norm(x["title"]) + " " + _norm(x["body"]) for x in issues)
+    fails = []
+    for line in brief_md.splitlines():
+        if re.match(r'> ["\u201c]', line):
+            continue  # a blockquote is checked by quote_failures, with its source link
+        for q in INLINE.findall(line.lstrip("> ")):
+            if _norm(q).rstrip(".,;:") not in sources:
+                fails.append({"claim": f'quote "{q[:60]}"', "verdict": "NOT_SUPPORTED",
+                              "reason": "quoted words not found in any issue"})
+    return fails

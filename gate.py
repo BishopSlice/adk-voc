@@ -38,3 +38,48 @@ def write_hold(d: Path, week: str, decision: dict, failures: list[dict]) -> Path
     p = Path(d) / "HOLD.md"
     p.write_text(text)
     return p
+
+
+# Ask first: themes, weights and sources. The whole config is guarded (models and bars too), so nothing
+# changes unattended. A run holds until a human records approval of the exact config.
+def _guarded(cfg_path) -> dict:
+    import yaml
+    return yaml.safe_load(open(cfg_path))
+
+
+def config_unapproved(cfg_path, approved_path) -> str:
+    """Empty when the guarded config matches the last approval. Otherwise says what changed."""
+    import json
+    now = _guarded(cfg_path)
+    p = Path(approved_path)
+    if not p.exists() or not p.read_text().strip():
+        return "themes, weights and sources were never approved"
+    last = json.loads(p.read_text().strip().splitlines()[-1])
+    last = {k: v for k, v in last.items() if k not in ("by", "date")}
+    diffs = []
+    if sorted(now.get("repos", [])) != sorted(last.get("repos", [])):
+        diffs.append("sources")
+    if sorted(now.get("themes", {})) != sorted(last.get("themes", {})):
+        diffs.append("themes")
+    elif now.get("themes") != last.get("themes"):
+        diffs.append("weights")
+    diffs += sorted(k for k in set(now) | set(last) if k not in ("repos", "themes") and now.get(k) != last.get(k))
+    return f"{', '.join(diffs)} changed since the last approval" if diffs else ""
+
+
+def approve_config(cfg_path, approved_path, by: str) -> None:
+    import datetime
+    import json
+    with open(approved_path, "a") as f:
+        f.write(json.dumps({**_guarded(cfg_path), "by": by, "date": datetime.date.today().isoformat()}) + "\n")
+
+
+if __name__ == "__main__":  # python3 gate.py approve-config --by Vicky
+    import argparse
+    ap = argparse.ArgumentParser()
+    ap.add_argument("cmd", choices=["approve-config"])
+    ap.add_argument("--by", required=True)
+    a = ap.parse_args()
+    here = Path(__file__).resolve().parent
+    approve_config(here / "config.yaml", here / "config.approved", a.by)
+    print("Approved the current themes, weights and sources.")
