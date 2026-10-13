@@ -26,30 +26,45 @@ Found a wrong claim? Open an issue in this repo.
 
 ## How it works
 ```mermaid
-flowchart TD
-  A["New issues from 5 ADK repos<br/>GitHub search API"] --> B["Remove spam<br/>fixed rules"]
-  B --> C["Sort into 10 themes<br/>Sonnet"]
-  C --> D["Count, trend and pain score<br/>code"]
-  D --> E["Write the brief<br/>Sonnet"]
-  E --> F["Check every claim<br/>Opus, plus code for quotes and numbers"]
-  F -->|"95% or more verified"| G["Publish to this repo"]
-  F -->|"below 95%"| H["Revise once and recheck"]
-  H -->|"passes"| G
-  H -->|"still fails"| I["Hold and notify a person"]
+flowchart LR
+  A["`**Fetch**
+  New issues from 5 ADK repos, via the GitHub search API.`"] --> B["`**Filter**
+  Fixed rules remove spam.`"]
+  B --> C["`**Sort**
+  Sonnet assigns each issue to one of 10 themes.`"]
+  C --> D["`**Score**
+  Code computes counts, trends and pain.`"]
+  D --> E["`**Write**
+  Sonnet drafts the brief.`"]
+  E --> F["`**Check**
+  Opus verifies every claim. Code checks quotes and numbers.`"]
+  F -->|"95% or more verified."| G["`**Publish**
+  The brief goes to this repo.`"]
+  F -->|"Below 95%."| H["`**Revise**
+  One rewrite, then a recheck.`"]
+  H -->|"Passes."| G
+  H -->|"Still fails."| I["`**Hold**
+  Nothing is published. A person is notified.`"]
 ```
 Pain = issues × severity weight × repos affected × (1 + median comments ÷ 10). It ranks themes within a week.
 Issue text is untrusted, so the AI runs with no tools, connectors or settings.
 
 ## How it was built
-Built end to end with an AI-native product workflow: each stage produces a written artifact and ends at a human go/no-go gate.
+Built end to end with [PM Factory](https://github.com/BishopSlice/pm-factory), an AI-native product workflow: each stage produces a written artifact and ends at a human go/no-go gate.
 
 ```mermaid
-flowchart TD
-  F["Frame<br/>problem, user and success metric"] --> D["Discover<br/>mined real issues, tested the riskiest assumptions"]
-  D --> S["Define<br/>13 acceptance criteria, boundaries, red-team"]
-  S --> G["Design<br/>brief layout, prototype, two independent critiques"]
-  G --> B["Build<br/>6 slices, tests first, every slice reviewed"]
-  B --> L["Launch and learn<br/>weekly schedule, human spot-checks"]
+flowchart LR
+  F["`**Frame**
+  Set the problem, the user and the success metric.`"] --> D["`**Discover**
+  Mined real issues and tested the riskiest assumptions.`"]
+  D --> S["`**Define**
+  Wrote 13 acceptance criteria, boundaries and a red-team.`"]
+  S --> G["`**Design**
+  Shaped the brief, prototyped it, and ran two independent critiques.`"]
+  G --> B["`**Build**
+  Shipped 6 slices, tests first, each one reviewed.`"]
+  B --> L["`**Launch & Learn**
+  Runs weekly, with human spot-checks.`"]
 ```
 - **Riskiest assumptions first.** Before any code, AI sorting agreed with hand labels on 97% of real issues, and the checker judged 10 of 10 claims correctly, including 2 deliberately false ones.
 - **Evals with a holdout.** The classifier scores 97 to 100% on the dev set and 9 of 9 on fresh issues it never saw, beating keyword rules by at least 5 points.
