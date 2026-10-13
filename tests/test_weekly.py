@@ -196,3 +196,11 @@ def test_wrapper_logs_and_counts_an_error_when_python_dies_before_logging(tmp_pa
     assert rows_[-1]["outcome"] == "error" and rows_[-1]["week"] == "2026-10-05"
     assert list(rows_[0]) == runlog.COLUMNS
     assert not (app / "data" / ".lock").exists()
+
+
+def test_wrapper_path_finds_a_python_with_the_packages():
+    """launchd uses the wrapper's PATH, not the shell's. Its python3 must import the requirements."""
+    line = next(x for x in (APP / "run_weekly.sh").read_text().splitlines() if x.startswith("export PATH="))
+    path = line.split("=", 1)[1].strip('"').replace("$HOME", str(Path.home()))
+    r = subprocess.run(["sh", "-c", "python3 -c 'import yaml'"], env={"PATH": path, "HOME": str(Path.home())})
+    assert r.returncode == 0
