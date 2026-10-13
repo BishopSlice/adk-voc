@@ -30,6 +30,7 @@ def main():
     """Every run ends with a runs.csv row, and every hold or error with a notification."""
     a = parse_args()
     d = HERE / "data" / a.week
+    LOG = HERE / "data" / "runs.csv"
     row = {"week": a.week, "run_start": now(), "outcome": "error"}
     ctx = {"step": "fetch"}
     try:
@@ -38,19 +39,19 @@ def main():
         kind = runlog.error_kind(e)
         if not kind:
             row["note"] = f"{ctx['step']}: {e}"[:200]
-            notify.notify(f"error, week {a.week}", row["note"])
+            notify.notify(f"error, week {a.week}", row["note"] + runlog.give_up_note(LOG, a.week))
             raise
         p = runlog.write_auth_hold(d, a.week, kind, ctx["step"])
         row.update(outcome="hold", note=f"{kind} error at {ctx['step']}")
         notify.notify(f"HOLD, week {a.week}", f"{row['note']}. See {p}")
         print("HOLD:", p)
-    except Exception as e:
+    except BaseException as e:  # SystemExit and Ctrl-C too: never a silent error
         row["note"] = f"{ctx['step']}: {type(e).__name__}: {e}"[:200]
-        notify.notify(f"error, week {a.week}", row["note"])
+        notify.notify(f"error, week {a.week}", row["note"] + runlog.give_up_note(LOG, a.week))
         raise
     finally:
         row["run_end"] = now()
-        runlog.append(HERE / "data" / "runs.csv", row)
+        runlog.append(LOG, row)
 
 
 def now():

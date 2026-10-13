@@ -44,6 +44,17 @@ def due_week(now: dt.datetime, f: Path) -> str | None:
     return week
 
 
+def error_count(f: Path, week: str) -> int:
+    return sum(r["week"] == week and r["outcome"] == "error" for r in csv.DictReader(open(f))) if Path(f).exists() else 0
+
+
+def give_up_note(f: Path, week: str) -> str:
+    """Said on the last automatic retry, so a dismissed banner isn't the only warning."""
+    if error_count(f, week) + 1 < MAX_ERRORS:
+        return ""
+    return f" Giving up after {MAX_ERRORS} tries. Fix it, then run app/run_weekly.sh {week}."
+
+
 def deadline(week: str) -> str:
     """On schedule means published by Wednesday 23:59 of the week the run happens."""
     wed = dt.date.fromisoformat(week) + dt.timedelta(days=9)

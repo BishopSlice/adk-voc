@@ -198,9 +198,79 @@ def test_wrapper_logs_and_counts_an_error_when_python_dies_before_logging(tmp_pa
     assert not (app / "data" / ".lock").exists()
 
 
+@pytest.mark.skipif(not Path("/Library/Frameworks/Python.framework/Versions/3.13/bin").exists(),
+                    reason="machine-specific: Vicky's Mac")
 def test_wrapper_path_finds_a_python_with_the_packages():
     """launchd uses the wrapper's PATH, not the shell's. Its python3 must import the requirements."""
     line = next(x for x in (APP / "run_weekly.sh").read_text().splitlines() if x.startswith("export PATH="))
     path = line.split("=", 1)[1].strip('"').replace("$HOME", str(Path.home()))
     r = subprocess.run(["sh", "-c", "python3 -c 'import yaml'"], env={"PATH": path, "HOME": str(Path.home())})
     assert r.returncode == 0
+
+
+def test_give_up_note_on_the_last_retry_only(tmp_path):
+    f = tmp_path / "runs.csv"
+    assert runlog.give_up_note(f, "2026-10-12") == ""
+    for _ in range(2):
+        runlog.append(f, {"week": "2026-10-12", "outcome": "error"})
+    assert "Giving up" in runlog.give_up_note(f, "2026-10-12") and "run_weekly.sh 2026-10-12" in runlog.give_up_note(f, "2026-10-12")
+
+
+def _wrapper_app(tmp_path, run_py="raise SystemExit(0)\n", runlog_py=None):
+    import os
+    import shutil
+    app = tmp_path / "app"
+    (app / "data").mkdir(parents=True)
+    shutil.copy(APP / "run_weekly.sh", app)
+    (app / "run.py").write_text(run_py)
+    (app / "runlog.py").write_text(runlog_py or (APP / "runlog.py").read_text())
+    log = tmp_path / "notified"
+    stub = tmp_path / "notify.sh"
+    stub.write_text(f'#!/bin/sh\necho "$@" >> {log}\n')
+    stub.chmod(0o755)
+    env = {**os.environ, "ADKVOC_NOTIFY": str(stub)}
+    return app, env, log
+
+
+def test_stale_lock_from_a_dead_run_is_cleared_and_announced(tmp_path):
+    app, env, log = _wrapper_app(tmp_path)
+    (app / "data" / ".lock").mkdir()
+    (app / "data" / ".lock" / "pid").write_text("999999")  # no such process
+    r = subprocess.run(["sh", str(app / "run_weekly.sh"), "2026-10-05"], env=env, capture_output=True)
+    assert r.returncode == 0 and "stale lock" in log.read_text()
+    assert not (app / "data" / ".lock").exists()
+
+
+def test_live_lock_means_skip_quietly(tmp_path):
+    import os
+    app, env, log = _wrapper_app(tmp_path, run_py="raise SystemExit(9)\n")
+    (app / "data" / ".lock").mkdir()
+    (app / "data" / ".lock" / "pid").write_text(str(os.getpid()))  # alive
+    r = subprocess.run(["sh", str(app / "run_weekly.sh"), "2026-10-05"], env=env, capture_output=True)
+    assert r.returncode == 0 and not log.exists() and (app / "data" / ".lock").exists()
+
+
+def test_due_week_crash_is_logged_and_notified(tmp_path):
+    app, env, log = _wrapper_app(tmp_path, runlog_py="raise SystemExit(1)\n")
+    r = subprocess.run(["sh", str(app / "run_weekly.sh")], env=env, capture_output=True)
+    assert r.returncode == 1 and "due_week failed" in log.read_text()
+    assert rows(app / "data" / "runs.csv")[-1]["outcome"] == "error"
+
+
+def test_wrapper_runs_the_due_week_end_to_end(tmp_path):
+    app, env, log = _wrapper_app(tmp_path, run_py="import sys; open('ran', 'w').write(sys.argv[2])\n")
+    r = subprocess.run(["sh", str(app / "run_weekly.sh")], env=env, capture_output=True)
+    assert r.returncode == 0 and (app / "ran").read_text() == runlog.due_week(dt.datetime.now(), app / "x")
+
+
+def test_wrapper_rejects_a_malformed_week(tmp_path):
+    app, env, log = _wrapper_app(tmp_path)
+    r = subprocess.run(["sh", str(app / "run_weekly.sh"), 'x"; do shell script "id'], env=env, capture_output=True)
+    assert r.returncode == 2 and not (app / "data" / "runs.csv").exists()
+
+
+def test_system_exit_inside_the_run_notifies(tmp_path, monkeypatch):
+    run, d, sent = _fake_week(tmp_path, monkeypatch, SystemExit("--recheck: 3 issues unlabeled"))
+    with pytest.raises(SystemExit):
+        run.main()
+    assert sent and rows(tmp_path / "data" / "runs.csv")[-1]["outcome"] == "error"
