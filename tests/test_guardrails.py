@@ -251,3 +251,11 @@ def test_push_url_is_what_gets_checked(tmp_path):
     subprocess.run(["git", "-C", str(repo), "config", "remote.origin.pushurl", "https://github.com/evil/x"], check=True)
     with pytest.raises(RuntimeError, match="origin"):
         publish.push_origin(repo)
+
+
+def test_defect_title_with_bypassing_does_not_hold():
+    # Real false hold, timer test 2026-10-13: a red-flag line fell back to py#7315's title.
+    line = ("- Reported (security, open): A2aAgentExecutor publishes raw exception text to the peer, bypassing t. "
+            f"[py#7315: A2aAgentExecutor publishes raw exception text]({U})")
+    _, probs = brief.sanitize_brief(md_with(line), [{"url": U}])
+    assert probs == []

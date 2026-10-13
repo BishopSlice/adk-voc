@@ -18,3 +18,4 @@ One line per real failure: date, what broke, the rule that prevents it.
 - 2026-10-13: the TL;DR check stripped link URLs but counted [ ] brackets, so a 113-char line measured 123 and a 100%-verified brief held. Rule: compute 'visible' exactly as Markdown renders it.
 - 2026-10-13: launchd could not run a script under ~/Documents (exit 126, macOS privacy block), so the job failed before any logging. Rule: scheduled jobs run from a copy outside protected folders; check launchctl's last exit code right after install.
 - 2026-10-13: `git commit -a` failed with 'invalid object' because the pre-commit hook's tests ran git in temp repos with the hook's GIT_INDEX_FILE. Rule: tests that shell out to git clear GIT_* env vars (conftest).
+- 2026-10-13: the exploit filter held a real week on a red-flag line that fell back to a defect title ('...bypassing the...'). Rule: test new content filters against every real title and fallback string before shipping.
