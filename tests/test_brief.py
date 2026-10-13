@@ -10,3 +10,12 @@ def test_tldr_limits():
 def test_tldr_counts_visible_text_not_urls():
     line = "- Tools: 5 issues, e.g. [py#1: short](https://github.com/google/adk-python/issues/" + "1" * 120 + ")"
     assert tldr_ok("## TL;DR\n" + line + "\n\n## Next\n")
+
+
+def test_tldr_ignores_link_brackets_too():
+    # The real line from the held 2026-10-05 sim: 113 visible characters, 5 links.
+    u = "https://github.com/google/adk-python/issues/1"
+    line = (f"- Flags: [py#7464]({u}) session mix-up; [py#7445]({u}) error leak; [js#1005]({u}) remote approval; "
+            f"[go#1752]({u}) rerun; [java#1640]({u}) event loss")
+    assert tldr_ok("## TL;DR\n" + line + "\n\n## Next\n")
+    assert not tldr_ok("## TL;DR\n- " + "[x](u) " * 1 + "y" * 120 + "\n\n## Next\n")

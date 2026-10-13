@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key><string>com.vicky.adkvoc</string>
+  <!-- Install: copy to ~/Library/LaunchAgents/ and run launchctl bootstrap gui/$(id -u) on it.
+       The path below is filled in at install time. -->
+  <key>ProgramArguments</key>
+  <array><string>/bin/sh</string><string>APP_DIR/run_weekly.sh</string></array>
+  <!-- Monday 09:00 local. A missed time fires at the next wake. -->
+  <key>StartCalendarInterval</key>
+  <dict><key>Weekday</key><integer>1</integer><key>Hour</key><integer>9</integer><key>Minute</key><integer>0</integer></dict>
+  <!-- Catch-up if the Mac was off: hourly and at login. run_weekly.sh exits at once when nothing is due. -->
+  <key>StartInterval</key><integer>3600</integer>
+  <key>RunAtLoad</key><true/>
+  <key>StandardErrorPath</key><string>/tmp/adkvoc.err</string>
+</dict>
+</plist>
