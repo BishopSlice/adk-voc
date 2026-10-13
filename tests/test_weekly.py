@@ -1,0 +1,182 @@
+"""Slice 5: run log (AC12), catch-up, notifications and auth/limit holds (AC11)."""
+import csv
+import datetime as dt
+import subprocess
+import sys
+from pathlib import Path
+
+import pytest
+
+import runlog
+from llm import ClaudeError
+
+APP = Path(__file__).resolve().parent.parent
+
+
+def rows(p):
+    return list(csv.DictReader(open(p)))
+
+
+# --- AC12 run log ---------------------------------------------------------------
+
+def test_row_written_with_every_spec_column(tmp_path):
+    f = tmp_path / "runs.csv"
+    runlog.append(f, {"week": "2026-10-05", "outcome": "pass", "fetched": 150})
+    runlog.append(f, {"week": "2026-10-12", "outcome": "hold"})
+    r = rows(f)
+    assert list(r[0]) == runlog.COLUMNS
+    assert {"week", "run_start", "run_end", "fetched", "spam", "claims", "pass_rate", "retries",
+            "tokens", "other_share", "outcome"} <= set(runlog.COLUMNS)
+    assert r[0]["fetched"] == "150" and r[1]["outcome"] == "hold" and r[1]["claims"] == "n/a"
+
+
+def test_unknown_column_is_a_bug_not_silently_dropped(tmp_path):
+    with pytest.raises(KeyError):
+        runlog.append(tmp_path / "runs.csv", {"week": "w", "outcome": "pass", "typo": 1})
+
+
+def test_other_share_and_drift_flag():
+    labels = {f"u{i}": ("Other" if i < 2 else "Tools") for i in range(10)}
+    assert runlog.other_share(labels, [f"u{i}" for i in range(10)]) == 0.2
+    assert runlog.other_share(labels, []) == 0.0
+    assert runlog.drift(0.16, 0.15) and not runlog.drift(0.15, 0.15)
+
+
+# --- AC11 schedule: which week is due ---------------------------------------------
+
+MON = dt.datetime(2026, 10, 19, 9, 0)  # the run for the week of 2026-10-12
+
+
+def test_due_week_is_last_full_week_after_monday_0900(tmp_path):
+    f = tmp_path / "runs.csv"
+    assert runlog.due_week(MON, f) == "2026-10-12"
+    assert runlog.due_week(MON - dt.timedelta(minutes=1), f) == "2026-10-05"   # before 09:00
+    assert runlog.due_week(dt.datetime(2026, 10, 22, 8), f) == "2026-10-12"   # caught up Thursday after sleep
+
+
+def test_week_already_passed_or_held_is_not_rerun(tmp_path):
+    f = tmp_path / "runs.csv"
+    runlog.append(f, {"week": "2026-10-12", "outcome": "hold"})
+    assert runlog.due_week(MON, f) is None  # a hold waits for a human; no hourly token burn
+
+
+def test_errors_retry_at_most_three_times(tmp_path):
+    f = tmp_path / "runs.csv"
+    for _ in range(2):
+        runlog.append(f, {"week": "2026-10-12", "outcome": "error"})
+    assert runlog.due_week(MON, f) == "2026-10-12"
+    runlog.append(f, {"week": "2026-10-12", "outcome": "error"})
+    assert runlog.due_week(MON, f) is None
+
+
+def test_spotcheck_rows_do_not_count_as_runs(tmp_path):
+    f = tmp_path / "runs.csv"
+    runlog.append(f, {"week": "2026-10-12", "outcome": "spotcheck", "note": "agreed 5/5"})
+    assert runlog.due_week(MON, f) == "2026-10-12"
+
+
+def test_deadline_is_wednesday_2359_of_the_run_week():
+    assert runlog.deadline("2026-10-12") == "Wednesday 2026-10-21, 23:59"
+
+
+# --- auth and usage-limit errors ---------------------------------------------------
+
+@pytest.mark.parametrize("msg,kind", [
+    ("Invalid API key · Please run /login", "auth"),
+    ("OAuth token has expired. Please run claude login", "auth"),
+    ("Claude AI usage limit reached|1760000000", "limit"),
+    ("5-hour limit reached ∙ resets 2pm", "limit"),
+    ("connection reset by peer", None),
+])
+def test_error_kind(msg, kind):
+    assert runlog.error_kind(ClaudeError(msg)) == kind
+
+
+def test_auth_hold_names_the_fix_and_deadline(tmp_path):
+    p = runlog.write_auth_hold(tmp_path, "2026-10-12", "auth", "classify")
+    t = p.read_text()
+    assert "Not published" in t and "claude login" in t and "run_weekly.sh 2026-10-12" in t
+    assert "Wednesday 2026-10-21, 23:59" in t and "classify" in t
+
+
+# --- notify ------------------------------------------------------------------------
+
+def test_notify_uses_osascript_and_escapes_quotes(monkeypatch):
+    import notify
+    calls = []
+    monkeypatch.setattr(notify.subprocess, "run", lambda cmd, **k: calls.append(cmd))
+    notify.notify('HOLD "W"', 'bad \\ "thing"')
+    cmd = calls[0]
+    assert cmd[0] == "osascript" and '\\"thing\\"' in cmd[2] and 'with title "adk-voc: HOLD \\"W\\""' in cmd[2]
+
+
+def test_notify_never_raises(monkeypatch):
+    import notify
+
+    def boom(*a, **k):
+        raise FileNotFoundError("osascript")
+    monkeypatch.setattr(notify.subprocess, "run", boom)
+    notify.notify("t", "m")  # a missing notifier must not crash the run log
+
+
+# --- run.py end to end with a fake Claude --------------------------------------------
+
+def _fake_week(tmp_path, monkeypatch, ask_error=None):
+    import run
+    monkeypatch.setattr(run, "HERE", tmp_path)
+    (tmp_path / "config.yaml").write_text((APP / "config.yaml").read_text())
+    d = tmp_path / "data" / "2026-10-05"
+    d.mkdir(parents=True)
+    (d / "issues.json").write_text("[]")
+    sent = []
+    monkeypatch.setattr(run.notify, "notify", lambda t, m: sent.append((t, m)))
+
+    def fail(*a, **k):
+        raise ask_error
+    monkeypatch.setattr(run.classify, "classify", fail)
+    monkeypatch.setattr(sys, "argv", ["run.py", "--week", "2026-10-05", "--skip-fetch"])
+    return run, d, sent
+
+
+def test_auth_error_writes_hold_notifies_and_logs(tmp_path, monkeypatch):
+    run, d, sent = _fake_week(tmp_path, monkeypatch, ClaudeError("Please run /login"))
+    run.main()
+    assert "claude login" in (d / "HOLD.md").read_text()
+    assert sent and "HOLD" in sent[0][0]
+    r = rows(tmp_path / "data" / "runs.csv")
+    assert r[-1]["outcome"] == "hold" and r[-1]["week"] == "2026-10-05" and "auth" in r[-1]["note"]
+
+
+def test_unexpected_error_still_logs_and_notifies_then_raises(tmp_path, monkeypatch):
+    run, d, sent = _fake_week(tmp_path, monkeypatch, RuntimeError("boom"))
+    with pytest.raises(RuntimeError):
+        run.main()
+    assert rows(tmp_path / "data" / "runs.csv")[-1]["outcome"] == "error" and sent
+
+
+# --- spotcheck writes to runs.csv ----------------------------------------------------
+
+def test_spotcheck_records_in_run_log(tmp_path, monkeypatch):
+    import spotcheck
+    monkeypatch.setattr(spotcheck, "HERE", tmp_path)
+    monkeypatch.setattr(sys, "argv", ["spotcheck.py", "--week", "2026-10-05", "--agree", "4"])
+    spotcheck.main()
+    r = rows(tmp_path / "data" / "runs.csv")[-1]
+    assert r["outcome"] == "spotcheck" and r["note"] == "agreed 4/5"
+
+
+# --- launchd plist and wrapper -------------------------------------------------------
+
+def test_plist_is_valid_monday_0900_with_hourly_catch_up():
+    import plistlib
+    p = plistlib.loads((APP / "launchd" / "com.vicky.adkvoc.plist").read_bytes())
+    assert p["StartCalendarInterval"] == {"Weekday": 1, "Hour": 9, "Minute": 0}
+    assert p["StartInterval"] == 3600 and p["RunAtLoad"] is True
+    assert p["ProgramArguments"][-1].endswith("run_weekly.sh")
+
+
+def test_wrapper_shell_syntax_and_publish_flag():
+    sh = APP / "run_weekly.sh"
+    assert subprocess.run(["sh", "-n", str(sh)]).returncode == 0
+    t = sh.read_text()
+    assert "--publish" in t and "due_week" in t and "--force" not in t

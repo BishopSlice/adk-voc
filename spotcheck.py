@@ -1,11 +1,12 @@
 """AC13: pick 5 random supported claims for Vicky to check by hand, and record agreement."""
 import argparse
-import csv
 import datetime as dt
 import json
 import random
 import re
 from pathlib import Path
+
+import runlog
 
 HERE = Path(__file__).resolve().parent
 
@@ -60,13 +61,8 @@ def main():
             print(f"- {c['id']} ({kind(c, refs)}): {c['claim']}\n  evidence: {c.get('evidence', '')[:200]}")
         print(f"\nCheck each against its issue, then run: python3 spotcheck.py --week {a.week} --agree N")
         return
-    f = HERE / "data" / "spotcheck.csv"
-    new = not f.exists()
-    with open(f, "a", newline="") as fh:
-        w = csv.writer(fh)
-        if new:
-            w.writerow(["week", "date", "agreed_of_5"])
-        w.writerow([a.week, dt.date.today().isoformat(), a.agree])
+    runlog.append(HERE / "data" / "runs.csv", {"week": a.week, "run_start": dt.date.today().isoformat(),
+                                               "outcome": "spotcheck", "note": f"agreed {a.agree}/5"})
     print("Recorded." + (" Disagreement: fix the checker prompt before the next run." if a.agree < 5 else ""))
 
 
