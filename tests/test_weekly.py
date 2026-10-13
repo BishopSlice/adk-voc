@@ -228,7 +228,7 @@ def _wrapper_app(tmp_path, run_py="raise SystemExit(0)\n", runlog_py=None):
     stub = tmp_path / "notify.sh"
     stub.write_text(f'#!/bin/sh\necho "$@" >> {log}\n')
     stub.chmod(0o755)
-    env = {**os.environ, "ADKVOC_NOTIFY": str(stub)}
+    env = {**os.environ, "ADKVOC_NOTIFY": str(stub), "ADKVOC_NO_PULL": "1"}
     return app, env, log
 
 
@@ -274,3 +274,8 @@ def test_system_exit_inside_the_run_notifies(tmp_path, monkeypatch):
     with pytest.raises(SystemExit):
         run.main()
     assert sent and rows(tmp_path / "data" / "runs.csv")[-1]["outcome"] == "error"
+
+
+def test_wrapper_pulls_latest_code_before_running():
+    t = (APP / "run_weekly.sh").read_text()
+    assert t.index("git pull --ff-only") < t.index("python3 run.py")

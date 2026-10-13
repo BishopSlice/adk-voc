@@ -43,6 +43,10 @@ case "$week" in
 esac
 
 echo "$(date '+%F %T') run week $week" >> data/weekly.log
+# The scheduled copy lives outside ~/Documents (macOS blocks background jobs there). Get the latest code first.
+if [ -d .git ] && [ -z "${ADKVOC_NO_PULL:-}" ]; then
+  git pull --ff-only -q >> data/weekly.log 2>&1 || notify "pull failed" "Running with the code already here. See data/weekly.log"
+fi
 before=$(cat data/runs.csv 2>/dev/null | wc -l)
 python3 run.py --week "$week" --publish >> data/weekly.log 2>&1
 code=$?
