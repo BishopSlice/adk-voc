@@ -15,3 +15,4 @@ One line per real failure: date, what broke, the rule that prevents it.
 - 2026-10-13: an edit that rewrote "from test X to end of file" deleted a later test. Rule: compare test counts before and after editing test files.
 - 2026-10-13: gh was logged in but git used SSH with no key, so the first push failed. Rule: the repo remote is HTTPS with a repo-local gh credential helper.
 - 2026-10-13: the launchd wrapper's PATH put Homebrew python3 (no packages) first, so every scheduled run would crash on import yaml; tests passed because they used the shell's PATH. Rule: test the scheduled command with the scheduler's environment, not yours.
+- 2026-10-13: the TL;DR check stripped link URLs but counted [ ] brackets, so a 113-char line measured 123 and a 100%-verified brief held. Rule: compute 'visible' exactly as Markdown renders it.
