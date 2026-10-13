@@ -180,3 +180,19 @@ def test_wrapper_shell_syntax_and_publish_flag():
     assert subprocess.run(["sh", "-n", str(sh)]).returncode == 0
     t = sh.read_text()
     assert "--publish" in t and "due_week" in t and "--force" not in t
+
+
+def test_wrapper_logs_and_counts_an_error_when_python_dies_before_logging(tmp_path):
+    import shutil
+    app = tmp_path / "app"
+    app.mkdir()
+    shutil.copy(APP / "run_weekly.sh", app)
+    (app / "run.py").write_text("raise SystemExit(3)\n")  # dies before any run-log code
+    import os
+    env = {**os.environ, "ADKVOC_NOTIFY": "true"}  # no real banner during tests
+    r = subprocess.run(["sh", str(app / "run_weekly.sh"), "2026-10-05"], capture_output=True, env=env)
+    assert r.returncode == 3
+    rows_ = rows(app / "data" / "runs.csv")
+    assert rows_[-1]["outcome"] == "error" and rows_[-1]["week"] == "2026-10-05"
+    assert list(rows_[0]) == runlog.COLUMNS
+    assert not (app / "data" / ".lock").exists()
