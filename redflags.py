@@ -10,7 +10,9 @@ from llm import ask_claude, fence
 HERE = Path(__file__).resolve().parent
 CATEGORIES = {"security", "data-loss", "side-effects", "safety-gate"}
 ALLOWED = re.compile(r"[A-Za-z0-9 ,.'’-]+")
-BANNED = re.compile(r"\b(critical|severe|vulnerab\w*|confirmed|alarming|exploit\w*|payload|curl|cve)\b", re.I)
+BANNED = re.compile(r"\b(critical|severe|vulnerab\w*|confirmed|alarming|exploit\w*|payload|curl|cve|"
+                    r"bypass\w*|skip\w*|header|token|password|secret|"  # no exploit steps
+                    r"reported by|according to|says|said|claims?|wrote)\b|\bX-[A-Za-z-]+", re.I)  # no people
 
 
 TRIAGE = re.compile(r"\b(P[34]|S[34])\b|infeasible|won'?t fix|working as intended", re.I)

@@ -15,7 +15,17 @@ def git(repo, *args, identity=None):
     return subprocess.run(["git", "-C", str(repo), *pre, *args], capture_output=True, text=True, check=True).stdout
 
 
+ORIGIN = re.compile(r"https://github\.com/BishopSlice/adk-voc(\.git)?")  # Ask first: the project repo only
+
+
+def origin_ok(url: str) -> bool:
+    return bool(ORIGIN.fullmatch(url.strip()))
+
+
 def push_origin(repo):
+    url = git(repo, "remote", "get-url", "origin")
+    if not origin_ok(url):
+        raise RuntimeError(f"origin is {url.strip()!r}; publishing anywhere but the project repo is Ask first")
     git(repo, "push", "origin", "HEAD:main")
 
 
@@ -45,6 +55,8 @@ def publish(repo: Path, week: str, md: str, stats: dict, push=push_origin, ident
             push(repo)  # resume: committed earlier, push failed
             return str(target)
         raise FileExistsError(f"{target} is already published; re-publishing an edited brief is Ask first")
+    if git(repo, "log", "--all", "--format=%H", "--", rel).strip():
+        raise FileExistsError(f"{rel} was published before (deleted since); re-publishing is Ask first")
     if git(repo, "status", "--porcelain", "--", "README.md", "briefs").strip():
         raise RuntimeError("README.md or briefs/ has uncommitted changes; publish needs a clean tree")
     readme = (repo / "README.md").read_text()

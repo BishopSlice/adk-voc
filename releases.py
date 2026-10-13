@@ -20,12 +20,17 @@ def fetch_releases(repo: str) -> list[dict]:
         raise RuntimeError(f"GitHub releases fetch failed for {repo}")
 
 
-def recent_release(releases: list[dict], monday: str) -> dict | None:
-    """The newest release published in W-1 or W (the 14 days we fetch)."""
+def releases_in_window(releases: list[dict], monday: str) -> list[dict]:
+    """Every release published in W-1 or W (the 14 days we fetch), newest first."""
     start = (dt.date.fromisoformat(monday) - dt.timedelta(days=7)).isoformat()
     end = (dt.date.fromisoformat(monday) + dt.timedelta(days=6)).isoformat()
-    inside = [r for r in releases if start <= r["date"] <= end]
-    return max(inside, key=lambda r: r["date"]) if inside else None
+    return sorted((r for r in releases if start <= r["date"] <= end), key=lambda r: r["date"], reverse=True)
+
+
+def recent_release(releases: list[dict], monday: str) -> dict | None:
+    """The newest release in the window. Regressions and rates are measured from it."""
+    inside = releases_in_window(releases, monday)
+    return inside[0] if inside else None
 
 
 def semver(tag: str) -> str | None:
@@ -57,7 +62,8 @@ def regressions(issues: list[dict], version: str) -> set:
 
 
 def rate_changes(issues, labels, release_date, start, end, min_after=5) -> list[dict]:
-    """Themes with at least 2x the issues in an equal-length window after the release."""
+    """Themes whose issue count changed at least 2x (up or down) in equal windows around the release.
+    The larger side needs at least min_after issues."""
     d = dt.date.fromisoformat
     days = min((d(release_date) - d(start)).days, (d(end) - d(release_date)).days + 1)
     if days < 3:
@@ -71,7 +77,7 @@ def rate_changes(issues, labels, release_date, start, end, min_after=5) -> list[
     out = []
     for t in sorted(set(before) | set(after)):
         rb, ra = before[t] / days_before, after[t] / days_after
-        if after[t] >= min_after and ra >= 2 * rb:
+        if (after[t] >= min_after and ra >= 2 * rb) or (before[t] >= min_after and rb >= 2 * ra):
             last_before = (d(release_date) - dt.timedelta(days=1)).isoformat()
             out.append({"theme": t, "before": before[t], "after": after[t], "days_before": days_before,
                         "days_after": days_after, "start": start, "last_before": last_before,
@@ -85,7 +91,7 @@ def compare_days(release_date: str, start: str, end: str) -> int:
 
 
 def render_since_release(recent: dict, regs: dict, changes: dict, titles: dict | None = None,
-                         start: str = "", end: str = "") -> str:
+                         start: str = "", end: str = "", others: dict | None = None) -> str:
     """recent: repo -> release or None. regs: repo -> [urls]. changes: repo -> rate_changes rows."""
     titles = titles or {}
     lines, none = ["## Since last release"], []
@@ -94,6 +100,9 @@ def render_since_release(recent: dict, regs: dict, changes: dict, titles: dict |
             none.append(repo)
             continue
         lines.append(f"**{repo} {rel['tag']}, released {rel['date']}**")
+        if (others or {}).get(repo):
+            earlier = ", ".join(f"{r['tag']} ({r['date']})" for r in others[repo])
+            lines.append(f"- Also released in this window: {earlier}. Counts below are from {rel['tag']}.")
         for u in regs.get(repo, []):
             n = u.rsplit("/", 1)[1]
             lines.append(f"- Reported regression: [{SHORT.get(repo, repo)}#{n}: {titles.get(u, 'issue')}]({u})")
@@ -104,7 +113,7 @@ def render_since_release(recent: dict, regs: dict, changes: dict, titles: dict |
         if not regs.get(repo) and not changes.get(repo):
             n = compare_days(rel["date"], start, end) if start and end else 0
             window = f" comparing {n} days before and {n} days from the release" if n >= 3 else ""
-            lines.append(f"- No regressions reported. No theme reached 5 or more issues and 2x{window}.")
+            lines.append(f"- No regressions reported. No theme changed 2x with 5 or more issues{window}.")
         lines.append("")
     if none:
         lines.append(f"{', '.join(none)}: no release in this window.")

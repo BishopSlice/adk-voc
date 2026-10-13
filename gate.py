@@ -38,3 +38,46 @@ def write_hold(d: Path, week: str, decision: dict, failures: list[dict]) -> Path
     p = Path(d) / "HOLD.md"
     p.write_text(text)
     return p
+
+
+# Ask first: themes, weights and sources. A run holds until a human records approval of the exact config.
+def _guarded(cfg_path) -> dict:
+    import yaml
+    c = yaml.safe_load(open(cfg_path))
+    return {"repos": sorted(c["repos"]), "themes": c["themes"]}
+
+
+def config_unapproved(cfg_path, approved_path) -> str:
+    """Empty when the guarded config matches the last approval. Otherwise says what changed."""
+    import json
+    now = _guarded(cfg_path)
+    p = Path(approved_path)
+    if not p.exists() or not p.read_text().strip():
+        return "themes, weights and sources were never approved"
+    last = json.loads(p.read_text().strip().splitlines()[-1])
+    diffs = []
+    if now["repos"] != last["repos"]:
+        diffs.append("sources")
+    if sorted(now["themes"]) != sorted(last["themes"]):
+        diffs.append("themes")
+    elif now["themes"] != last["themes"]:
+        diffs.append("weights")
+    return f"{', '.join(diffs)} changed since the last approval" if diffs else ""
+
+
+def approve_config(cfg_path, approved_path, by: str) -> None:
+    import datetime
+    import json
+    with open(approved_path, "a") as f:
+        f.write(json.dumps({**_guarded(cfg_path), "by": by, "date": datetime.date.today().isoformat()}) + "\n")
+
+
+if __name__ == "__main__":  # python3 gate.py approve-config --by Vicky
+    import argparse
+    ap = argparse.ArgumentParser()
+    ap.add_argument("cmd", choices=["approve-config"])
+    ap.add_argument("--by", required=True)
+    a = ap.parse_args()
+    here = Path(__file__).resolve().parent
+    approve_config(here / "config.yaml", here / "config.approved", a.by)
+    print("Approved the current themes, weights and sources.")

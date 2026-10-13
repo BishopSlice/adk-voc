@@ -55,6 +55,18 @@ def give_up_note(f: Path, week: str) -> str:
     return f" Giving up after {MAX_ERRORS} tries. Fix it, then run app/run_weekly.sh {week}."
 
 
+def spotcheck_block(f: Path) -> str | None:
+    """AC13: after a spot-check disagreement, publishing waits until the checker prompt is fixed."""
+    block = None
+    for r in (csv.DictReader(open(f)) if Path(f).exists() else []):
+        m = re.fullmatch(r"agreed (\d)/5", r.get("note", "")) if r["outcome"] == "spotcheck" else None
+        if m:
+            block = None if m[1] == "5" else f"spot-check for {r['week']} agreed {m[1]}/5"
+        elif r["outcome"] == "checker-fixed":
+            block = None
+    return block
+
+
 def deadline(week: str) -> str:
     """On schedule means published by Wednesday 23:59 of the week the run happens."""
     wed = dt.date.fromisoformat(week) + dt.timedelta(days=9)
@@ -77,8 +89,13 @@ def error_kind(e: Exception) -> str | None:
 def write_auth_hold(d: Path, week: str, kind: str, step: str) -> Path:
     what = ("returned an authentication error" if kind == "auth" else "hit a usage limit")
     fix = ("Run `claude login`." if kind == "auth" else "Wait for the usage limit to reset.")
-    text = (f"# HOLD: week of {week}\n**Not published.** The run stopped at the {step} step. "
-            f"`claude -p` {what}.\n\n## Next step\n1. {fix}\n2. Run `app/run_weekly.sh {week}`.\n"
+    return write_hold(d, week, f"The run stopped at the {step} step. `claude -p` {what}.", fix)
+
+
+def write_hold(d: Path, week: str, why: str, fix: str) -> Path:
+    """A hold that needs a human before anything runs again (auth, limits, Ask-first, spot-check)."""
+    text = (f"# HOLD: week of {week}\n**Not published.** {why}\n\n## Next step\n1. {fix}\n"
+            f"2. From the app folder (`~/adk-voc` for the scheduled copy), run `./run_weekly.sh {week}`.\n"
             f"Deadline to stay on schedule: {deadline(week)}.\n")
     p = Path(d) / "HOLD.md"
     p.parent.mkdir(parents=True, exist_ok=True)
