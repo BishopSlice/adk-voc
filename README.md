@@ -16,6 +16,7 @@ Each week is named by its Monday. The brief publishes the following Monday.
 |---|---|---|---|
 | [2026-10-05](briefs/2026-10-05.md) | 83 | Published, 98% verified | Sessions, state and memory |
 | [2026-09-28](briefs/2026-09-28.md) | 59 | Published, 98% verified | Docs, CI and dev setup |
+| [2026-09-21](briefs/2026-09-21.md) | 62 | Published, 97% verified | Core runtime |
 <!-- index:end -->
 
 ## Why you can trust it
