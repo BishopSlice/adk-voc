@@ -1,6 +1,6 @@
 # ADK: Automated Voice-of-Customer Analysis
 
-Google's Agent Development Kit gets sixty to ninety new GitHub issues every week, spread across five repos. Somewhere in that pile is the bug that will cost a team a week, the security report nobody has looked at yet, and the regression that shipped with Tuesday's release.
+Google's Agent Development Kit gets sixty to ninety new GitHub issues every week, spread across multiple repos. Somewhere in that pile is the bug that will cost a team a week, the security report nobody has looked at yet, and the regression that shipped with Tuesday's release.
 
 A PM has three ways to keep up today. You can read every issue, which doesn't scale. You can watch a dashboard of labels, which misses anything nobody labeled. Or you can ask an AI to summarize, which sounds confident and is sometimes wrong.
 
