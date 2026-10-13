@@ -13,13 +13,16 @@ SHORT = {"adk-python": "py", "adk-go": "go", "adk-java": "java", "adk-js": "js",
 
 
 # Never: personal data. Emails first (they contain @), then @handles, which are removed, not just spaced.
-EMAIL = re.compile(r"[\w.+-]+@[\w-]+(\.[\w-]+)+")
-MENTION = re.compile(r"(?<![\w`])@[A-Za-z0-9][\w-]*")
+EMAIL = re.compile(r"(?<![\w/.+-])(?!git@)[\w.+-]+@[A-Za-z0-9-]+(\.[A-Za-z0-9-]+)*\.[A-Za-z]{2,}\b(?!:)")
+MENTION = re.compile(r"(?<![\w`])@[A-Za-z0-9][\w-]*(?![\w-]*/)")  # not @scope/pkg
 # Never: exploit details. Commands, addresses, bypass wording, headers and secrets. A match blocks the brief.
-EXPLOIT = re.compile(r"\b(curl|wget|rm -rf|base64|eval\(|exec\(|payload|exploit|/etc/passwd|bypass\w*|"
-                     r"\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})|\bX-[A-Za-z-]+\b|\bset\w* (the )?header|"
-                     r"Authorization:|\bBearer\s+\S+|\b(token|api[_-]?key|password|secret)\s*[=:]\s*\S+|"
+# Narrow on purpose: matched against prose with link text removed, so issue titles can't hold a week.
+EXPLOIT = re.compile(r"\b(curl|wget|sudo|exploit)\b|rm -rf|eval\(|exec\(|os\.system|/etc/passwd|\.\./\.\./|"
+                     r"\bOR 1=1|\bbypass(es|ed|ing)?\b(?!_)|\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b|"
+                     r"\bX-[A-Za-z-]+\s*:\s*\S|\bset\w* (the )?header|Authorization:\s*\S|"
+                     r"\bBearer\s+[\w.-]{12,}|\b(token|api[_-]?key|password|secret)\s*[=:]\s*(?=\S*\d)[\w.-]{6,}|"
                      r"\bsk-[\w-]{6,}", re.I)
+LINK_TEXT = re.compile(r"\[[^\]]*\]\([^)]*\)")
 
 
 def safe_text(s: str) -> str:
@@ -65,7 +68,7 @@ def sanitize_brief(md: str, issues: list[dict]) -> tuple[str, list[dict]]:
             md = md.replace(q, "(quote removed)")
     lines = md.split("\n")
     for i, line in enumerate(lines):
-        if EXPLOIT.search(line):
+        if EXPLOIT.search(LINK_TEXT.sub(" ", line)):
             bad(line, "exploit-style detail (command, bypass step, header or secret); line removed")
             lines[i] = "(line removed: exploit-style detail)"
     md = "\n".join(lines)

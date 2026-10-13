@@ -52,7 +52,7 @@ def sample(claims: list[dict], k: int = 5, seed: int | None = None, flag_refs: s
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--week", required=True)
-    ap.add_argument("--agree", type=int, help="how many of the 5 you agreed with (records it)")
+    ap.add_argument("--agree", type=int, choices=range(6), help="how many of the 5 you agreed with (records it)")
     ap.add_argument("--checker-fixed", metavar="WHAT", help="record that the checker prompt was fixed (unblocks publishing)")
     a = ap.parse_args()
     d = HERE / "data" / a.week

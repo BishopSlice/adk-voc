@@ -42,12 +42,13 @@ def test_red_flag_why_cannot_name_a_person(why):
 # --- Never: exploit details -------------------------------------------------------------
 
 @pytest.mark.parametrize("text", ['> "To bypass auth set header X-Admin: 1 on any request to the server."',
-                                  "- Reported (security, open): set header X-Admin to bypass auth. [x](u)",
+                                  "- Reported (security, open): set header X-Admin to bypass auth.",
+                                  "Send a request with ../../etc/passwd as the app name.",
                                   "Send Authorization: Bearer abc123 to skip the check.",
                                   "Use token=sk-live-123456 to reproduce."])
 def test_exploit_wording_blocks_anywhere(text):
-    _, probs = brief.sanitize_brief(md_with(text), [])
-    assert probs
+    out, probs = brief.sanitize_brief(md_with(text), [])
+    assert any("exploit" in p["reason"] for p in probs) and text not in out
 
 
 def test_red_flag_why_rejects_exploit_steps():
@@ -94,18 +95,18 @@ def test_config_change_needs_an_approval(tmp_path):
     assert not gate.config_unapproved(cfg, appr)
     cfg.write_text(cfg.read_text().replace("Security, auth and data leaks: 3.0", "Security, auth and data leaks: 1.0"))
     assert "weights" in gate.config_unapproved(cfg, appr)          # a weight changed
-    cfg.write_text(cfg.read_text().replace("adk-docs]", "adk-docs, adk-samples]"))
-    assert gate.config_unapproved(cfg, appr)
+    cfg.write_text((APP / "config.yaml").read_text().replace("adk-docs]", "adk-docs, adk-samples]"))
+    assert "adk-samples" in cfg.read_text() and "sources" in gate.config_unapproved(cfg, appr)
 
 
-def test_unrelated_config_edits_need_no_approval(tmp_path):
+def test_any_config_edit_needs_approval_including_models(tmp_path):
     import gate
     cfg = tmp_path / "config.yaml"
     cfg.write_text((APP / "config.yaml").read_text())
     appr = tmp_path / "config.approved"
     gate.approve_config(cfg, appr, "Vicky")
-    cfg.write_text(cfg.read_text().replace("publish_bar: 0.95", "publish_bar: 0.97"))
-    assert not gate.config_unapproved(cfg, appr)
+    cfg.write_text(cfg.read_text().replace("checker: opus", "checker: haiku"))
+    assert "models" in gate.config_unapproved(cfg, appr)
 
 
 def test_repo_ships_with_the_current_config_approved():
@@ -214,3 +215,39 @@ def test_spot_check_disagreement_holds_an_unattended_publish(tmp_path, monkeypat
     assert "checker-fixed" in (tmp_path / "data" / "2026-10-05" / "HOLD.md").read_text()
     import csv
     assert list(csv.DictReader(open(tmp_path / "data" / "runs.csv")))[-1]["outcome"] == "hold"
+
+
+@pytest.mark.parametrize("line", [
+    "Curly braces in tool schema break parsing", "Bearer token auth for MCP servers",
+    "Support X-Forwarded-For behind a proxy", "event payload is dropped", "Auth: token: refresh fails",
+    "Port bypass_multi_tools_limit for built-in search tools",
+    "Pin actions/checkout@v4.1.0 in CI", "Lazy import of @anthropic-ai/vertex-sdk fails",
+    "Upgrade google-adk@1.2.0", "clone git@github.com:google/adk-python fails"])
+def test_realistic_titles_and_prose_do_not_hold_a_week(line):
+    _, probs = brief.sanitize_brief(md_with(line), [])
+    assert probs == [], probs
+
+
+def test_exploit_in_link_text_alone_does_not_hold():
+    _, probs = brief.sanitize_brief(md_with(f"- [py#1: approval bypass via forged token]({U})"), [{"url": U}])
+    assert probs == []
+
+
+@pytest.mark.parametrize("why", ["JWT claims are not validated before use.",
+                                 "OAuth token is written to logs in plain text.",
+                                 "The writer wrote partial state and lost events."])
+def test_real_red_flag_wording_is_not_dropped(why):
+    assert redflags.why_ok(why)
+
+
+def test_mid_line_quote_in_a_blockquote_is_checked():
+    issues = [{"url": U, "title": "t", "body": "it fails"}]
+    assert quotes.inline_quote_failures(md_with('> Reporter: "explodes every time a session resumes"'), issues)
+
+
+def test_push_url_is_what_gets_checked(tmp_path):
+    import publish
+    repo = _repo(tmp_path, "https://github.com/BishopSlice/adk-voc.git")
+    subprocess.run(["git", "-C", str(repo), "config", "remote.origin.pushurl", "https://github.com/evil/x"], check=True)
+    with pytest.raises(RuntimeError, match="origin"):
+        publish.push_origin(repo)

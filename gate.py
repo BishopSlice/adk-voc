@@ -40,11 +40,11 @@ def write_hold(d: Path, week: str, decision: dict, failures: list[dict]) -> Path
     return p
 
 
-# Ask first: themes, weights and sources. A run holds until a human records approval of the exact config.
+# Ask first: themes, weights and sources. The whole config is guarded (models and bars too), so nothing
+# changes unattended. A run holds until a human records approval of the exact config.
 def _guarded(cfg_path) -> dict:
     import yaml
-    c = yaml.safe_load(open(cfg_path))
-    return {"repos": sorted(c["repos"]), "themes": c["themes"]}
+    return yaml.safe_load(open(cfg_path))
 
 
 def config_unapproved(cfg_path, approved_path) -> str:
@@ -55,13 +55,15 @@ def config_unapproved(cfg_path, approved_path) -> str:
     if not p.exists() or not p.read_text().strip():
         return "themes, weights and sources were never approved"
     last = json.loads(p.read_text().strip().splitlines()[-1])
+    last = {k: v for k, v in last.items() if k not in ("by", "date")}
     diffs = []
-    if now["repos"] != last["repos"]:
+    if sorted(now.get("repos", [])) != sorted(last.get("repos", [])):
         diffs.append("sources")
-    if sorted(now["themes"]) != sorted(last["themes"]):
+    if sorted(now.get("themes", {})) != sorted(last.get("themes", {})):
         diffs.append("themes")
-    elif now["themes"] != last["themes"]:
+    elif now.get("themes") != last.get("themes"):
         diffs.append("weights")
+    diffs += sorted(k for k in set(now) | set(last) if k not in ("repos", "themes") and now.get(k) != last.get(k))
     return f"{', '.join(diffs)} changed since the last approval" if diffs else ""
 
 

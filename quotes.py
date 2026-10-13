@@ -64,9 +64,9 @@ def inline_quote_failures(brief_md: str, issues: list[dict]) -> list[dict]:
     sources = " ".join(_norm(x["title"]) + " " + _norm(x["body"]) for x in issues)
     fails = []
     for line in brief_md.splitlines():
-        if line.startswith(">"):
-            continue  # blockquotes are checked by quote_failures, with their source link
-        for q in INLINE.findall(line):
+        if re.match(r'> ["\u201c]', line):
+            continue  # a blockquote is checked by quote_failures, with its source link
+        for q in INLINE.findall(line.lstrip("> ")):
             if _norm(q).rstrip(".,;:") not in sources:
                 fails.append({"claim": f'quote "{q[:60]}"', "verdict": "NOT_SUPPORTED",
                               "reason": "quoted words not found in any issue"})

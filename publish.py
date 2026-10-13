@@ -23,7 +23,7 @@ def origin_ok(url: str) -> bool:
 
 
 def push_origin(repo):
-    url = git(repo, "remote", "get-url", "origin")
+    url = git(repo, "remote", "get-url", "--push", "origin")  # the URL a push really uses
     if not origin_ok(url):
         raise RuntimeError(f"origin is {url.strip()!r}; publishing anywhere but the project repo is Ask first")
     git(repo, "push", "origin", "HEAD:main")
