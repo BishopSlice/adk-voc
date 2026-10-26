@@ -14,6 +14,7 @@ Each week is named by its Monday. The brief publishes the following Monday.
 <!-- index:start -->
 | Week | Issues | Status | Top theme |
 |---|---|---|---|
+| [2026-10-19](briefs/2026-10-19.md) | 98 | Published, 100% verified | Sessions, state and memory |
 | [2026-10-12](briefs/2026-10-12.md) | 85 | Published, 98% verified | Sessions, state and memory |
 | [2026-10-05](briefs/2026-10-05.md) | 83 | Published, 98% verified | Sessions, state and memory |
 | [2026-09-28](briefs/2026-09-28.md) | 59 | Published, 98% verified | Docs, CI and dev setup |
